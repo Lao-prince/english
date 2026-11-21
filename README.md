@@ -7,7 +7,7 @@ A personal teaching workspace for one English teacher and their students. Telegr
 Install Node.js 24 and npm, then run:
 
 ```sh
-npm install
+npm ci
 npm run build
 ```
 
@@ -20,7 +20,20 @@ npm run dev:web
 
 Open [the web app](http://localhost:5173) and check [API health through the web proxy](http://localhost:5173/api/health). Both can run without PostgreSQL. The health route reports API liveness only.
 
-To validate the initial Prisma schema, copy `.env.example` to `.env` and run `npm run db:validate`. Schema validation needs a database URL but does not connect to the database. Migrations start with the authentication milestone.
+## Telegram sign-in
+
+Use an empty PostgreSQL database for the initial migration. Copy `.env.example` to `.env`, set `DATABASE_URL` and `TELEGRAM_BOT_TOKEN`, and generate `SESSION_SECRET` with `openssl rand -hex 32`. Restart the API after changing configuration.
+
+```sh
+npm run db:generate
+npm run db:validate
+npm run db:migrate
+npm run user:provision -- teacher YOUR_TELEGRAM_ID
+npm run user:provision -- student STUDENT_TELEGRAM_ID
+npm test
+```
+
+Configure the bot's Mini App to point to the app's public HTTPS URL. Open it from Telegram with an approved account. The teacher and student see different home screens. See [Telegram identity](docs/IDENTITY.md) for the API and access rules.
 
 ## Project map
 
@@ -29,4 +42,4 @@ To validate the initial Prisma schema, copy `.env.example` to `.env` and run `np
 - `docs` contains the [product and MVP](docs/PRODUCT.md), [architecture](docs/ARCHITECTURE.md), [database model](docs/DATABASE.md), [user flows and open questions](docs/USER_FLOWS.md), [roadmap](docs/ROADMAP.md) and [decisions](docs/DECISIONS.md).
 - [AGENTS.md](AGENTS.md) records development instructions.
 
-Phase 0 includes the browser shell, API health endpoint and initial identity schema. See the roadmap for feature availability.
+The current release includes Telegram authentication and role-specific home screens. See the roadmap for scheduling and the first pilot.

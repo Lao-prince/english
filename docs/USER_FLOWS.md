@@ -7,7 +7,7 @@
 
 ## Decisions before business logic
 
-- How is the first teacher account provisioned? Do students join by invitation, self-register for approval, or both?
+- The pilot uses manual provisioning for both roles. Should later onboarding offer invitations, self-registration for approval, or both?
 - What is the teacher's IANA time zone? What durations, buffers, lead times and booking horizon apply? Can teacher availability overlap?
 - What is the cancellation and rescheduling cutoff? When should a cancelled slot reopen, and who may override the policy?
 - Does booking require a paid subscription? When do completion, late cancellation and no-show consume a credit? Can credits expire, roll over or be reinstated?

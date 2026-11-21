@@ -1,6 +1,6 @@
 # Database
 
-The current Prisma schema contains User and Role. The relationships below describe the proposed domain model. Optional associations cover lessons booked before subscription tracking and free slots without bookings.
+The current migration creates User and Role with a unique Telegram ID and a partial unique index that limits the database to one teacher. The relationships below describe the proposed domain model. Optional associations cover lessons booked before subscription tracking and free slots without bookings.
 
 ```mermaid
 erDiagram

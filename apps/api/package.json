@@ -3,10 +3,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "node --env-file-if-exists=../../.env --import tsx --watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
-    "db:validate": "node --env-file-if-exists=../../.env ../../node_modules/prisma/build/index.js validate"
+    "start": "node --env-file-if-exists=../../.env dist/index.js",
+    "db:validate": "node --env-file-if-exists=../../.env ../../node_modules/prisma/build/index.js validate",
+    "db:generate": "prisma generate",
+    "db:migrate": "node --env-file-if-exists=../../.env ../../node_modules/prisma/build/index.js migrate deploy",
+    "user:provision": "node --env-file-if-exists=../../.env --import tsx src/provision.ts",
+    "prebuild": "prisma generate",
+    "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",

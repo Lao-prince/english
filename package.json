@@ -1,12 +1,20 @@
 {
   "name": "english-space",
   "private": true,
-  "workspaces": ["apps/*"],
-  "engines": { "node": ">=24" },
+  "workspaces": [
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev:api": "npm run dev -w @english-space/api",
     "dev:web": "npm run dev -w @english-space/web",
     "build": "npm run build --workspaces",
-    "db:validate": "npm run db:validate -w @english-space/api"
+    "db:validate": "npm run db:validate -w @english-space/api",
+    "db:generate": "npm run db:generate -w @english-space/api",
+    "db:migrate": "npm run db:migrate -w @english-space/api",
+    "user:provision": "npm run user:provision -w @english-space/api --",
+    "test": "npm test -w @english-space/api"
   }
 }

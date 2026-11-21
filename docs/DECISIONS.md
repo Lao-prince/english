@@ -7,4 +7,5 @@
 | React and Vite with Tailwind | Supports a mobile-first browser app shared by Telegram and desktop. |
 | UTC instants and IANA time zones | Instants make bookings unambiguous. IANA zones preserve calendar rules across time changes. |
 | Separate availability, bookings and lessons | Availability can be published before assignment, booking history can outlive slot occupancy, and lessons can track attendance and materials. |
-| Defer grammY, the Telegram SDK and deployment dependencies | Add them in the phases that implement and exercise those integrations. |
+| Defer grammY and deployment dependencies | Add them in the phases that implement and exercise those integrations. |
+| Manual Telegram allowlist | Establishes explicit access for a private pilot and keeps role assignment under operator control. |
