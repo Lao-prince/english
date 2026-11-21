@@ -1,0 +1,21 @@
+{
+  "name": "@english-space/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "db:validate": "node --env-file-if-exists=../../.env ../../node_modules/prisma/build/index.js validate"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.0",
+    "fastify": "^5.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "prisma": "^6.19.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}

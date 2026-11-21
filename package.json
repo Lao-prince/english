@@ -1,0 +1,12 @@
+{
+  "name": "english-space",
+  "private": true,
+  "workspaces": ["apps/*"],
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "dev:api": "npm run dev -w @english-space/api",
+    "dev:web": "npm run dev -w @english-space/web",
+    "build": "npm run build --workspaces",
+    "db:validate": "npm run db:validate -w @english-space/api"
+  }
+}
