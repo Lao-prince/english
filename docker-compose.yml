@@ -1,0 +1,93 @@
+name: english-space
+
+x-service: &service
+  networks: [english-space]
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+x-api-image: &api-image
+  image: english-space-api:local
+  build:
+    context: .
+    dockerfile: apps/api/Dockerfile
+
+services:
+  db:
+    <<: *service
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    mem_limit: 768m
+    cpus: 1.0
+    shm_size: 128m
+    environment:
+      POSTGRES_DB: english_space
+      POSTGRES_USER: english_space
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U english_space -d english_space"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  migrate:
+    <<: [*service, *api-image]
+    init: true
+    restart: "no"
+    mem_limit: 512m
+    cpus: 1.0
+    command: ["npm", "run", "db:migrate"]
+    environment:
+      DATABASE_URL: &database-url "postgresql://english_space:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/english_space?connection_limit=5"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: [*service, *api-image]
+    init: true
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 1.0
+    environment:
+      API_HOST: 0.0.0.0
+      DATABASE_URL: *database-url
+      SESSION_SECRET: "${SESSION_SECRET:-}"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  web:
+    <<: *service
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    init: true
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+networks:
+  english-space:
+
+volumes:
+  postgres-data:
