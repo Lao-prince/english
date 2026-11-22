@@ -2,7 +2,7 @@
 
 The current migration creates User and Role with a unique Telegram ID and a partial unique index that limits the database to one teacher. The relationships below describe the proposed domain model. Optional associations cover lessons booked before subscription tracking and free slots without bookings.
 
-The VPS Compose stack runs PostgreSQL 17 with a project-scoped named volume and no host port. A one-shot Prisma migration service runs after the database becomes healthy. API startup requires a successful migration.
+The VPS Compose stack runs PostgreSQL 17 with a project-scoped named volume and no host port. A one-shot Prisma migration service runs after an authenticated PostgreSQL health query succeeds. Compose constructs the same database URL for the API and migration service using the private `db` hostname and the dedicated database password. The migration job validates the URL before running Prisma. API startup requires a successful migration.
 
 ```mermaid
 erDiagram

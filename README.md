@@ -35,37 +35,11 @@ npm test
 
 Configure the bot's Mini App to point to the app's public HTTPS URL. Open it from Telegram with an approved account. The teacher and student see different home screens. See [Telegram identity](docs/IDENTITY.md) for the API and access rules.
 
-## Docker Compose on a dedicated VPS
+## Docker Compose on a shared VPS
 
-Use Docker Engine with the Docker Compose v2 plugin. The API and Web images use Node.js 24 LTS. The host only needs Docker and Compose to run the stack.
+Follow the [VPS deployment guide](docs/DEPLOYMENT.md) after pulling the project into its own checkout. Set `POSTGRES_PASSWORD`, `SESSION_SECRET`, and `TELEGRAM_BOT_TOKEN` in an untracked `.env`. The `english-space` project owns its network and PostgreSQL volume. Its only published port is [the Web endpoint](http://127.0.0.1:8088) on VPS loopback. Node.js 24 runs inside the application containers.
 
-Copy `.env.example` to `.env` on the VPS and restrict access to it with `chmod 600 .env`. Set `POSTGRES_PASSWORD` to a 64-character hex value generated on that host with `openssl rand -hex 32`. Compose assembles the container database URL from that value. `DATABASE_URL` in the example is for local development. `WEB_PORT` defaults to 8080. Leave the Telegram settings blank for this setup.
-
-### Start or update
-
-```sh
-docker compose config --quiet
-docker compose up --build -d --wait
-docker compose ps -a
-curl --fail http://127.0.0.1:8080/api/health
-```
-
-Run these commands from the dedicated checkout. For updates, back up PostgreSQL first and run `docker compose down` before the start commands. This stops the old API before schema changes and recreates the migration job. Compose waits for PostgreSQL, runs `prisma migrate deploy`, then starts the API after a successful migration. The Web service starts after the API passes its health check. The `migrate` container should exit with code 0. If startup fails, inspect `docker compose logs db migrate api web`. Resolve a failed Prisma migration before retrying.
-
-### Stop
-
-```sh
-docker compose down
-```
-
-The named volume persists across stops. Keep `--volumes` off the shutdown command to preserve the database. PostgreSQL applies its initialization password only when creating the database. Changing `.env` on an existing volume requires rotating the database role password as well.
-
-### Operating limits
-
-- The Web port listens on VPS loopback over HTTP. API and PostgreSQL ports stay on the Compose network. Telegram sign-in stays unavailable in this deployment configuration.
-- Runtime memory ceilings total 2 GiB across all four containers, including the one-shot migration job. Image builds have separate resource usage. On a 3.8 GB host, build sequentially with `docker compose build api` and `docker compose build web` if the parallel build runs out of memory, then use `docker compose up -d --wait`.
-- The API health check measures liveness. Compose marks failed probes unhealthy and restarts services when their process exits under the restart policy. Backups and monitoring are host operations.
-- The Web server serves the current Vite HTML, CSS and JavaScript output and forwards `/api` on the same origin. Additional asset types, client-side routes or API headers may need corresponding server updates.
+Start with `docker compose -p english-space up -d --wait` after validating the configuration and building the images. Stop with `docker compose -p english-space down` to preserve the database volume.
 
 ## Project map
 
