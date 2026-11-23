@@ -27,6 +27,10 @@ erDiagram
 
 ## Planned constraints
 
+The lesson credit ledger stores immutable grants and debits. A unique booking reference prevents duplicate settlement. Writes lock the student's account row to protect the balance during concurrent debits. See [Lesson credit ledger](CREDITS.md).
+
+Student accounts can store a nullable teacher-assigned display name. Existing accounts and newly invited students can remain unnamed. See [Student roster](STUDENTS.md).
+
 Bookings use a partial unique index on the slot to allow one active reservation and retain cancelled reservations. Cancellation persists whether a lesson is chargeable for later credit settlement. Serializing calendar writes protects booking against concurrent closure and cancellation. See [Student booking](BOOKING.md).
 
 Student invitations store a hashed code, expiry and redemption time. Redemption and student account creation are atomic. See [Student invitations](INVITATIONS.md).

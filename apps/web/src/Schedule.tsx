@@ -3,7 +3,7 @@ import { Button, EmptyState, Field, Icon, IconButton, LoadingState, Notice, Pane
 
 type Slot = { id: string; startsAt: string; endsAt: string; timeZone: string };
 type Booking = Pick<Slot, 'id' | 'startsAt' | 'endsAt'> & {
-  slotId: string; studentReference?: string; cancellationChargeApplies?: boolean;
+  slotId: string; studentReference?: string; studentDisplayName?: string | null; cancellationChargeApplies?: boolean;
 };
 const endpoint = '/api/schedule/slots';
 const viewerZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -23,6 +23,7 @@ export function Schedule({ teacher, token, view }: { teacher: boolean; token: st
   const pending = useRef<{ key: string; id: string } | null>(null);
 
   useEffect(() => {
+    if (view === 'students') return;
     const controller = new AbortController();
     const options = { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal };
     Promise.all([fetch(endpoint, options), fetch('/api/schedule/bookings', options)])
@@ -38,7 +39,7 @@ export function Schedule({ teacher, token, view }: { teacher: boolean; token: st
         if (!controller.signal.aborted) setError('Could not load the schedule. Refresh to try again.');
       });
     return () => controller.abort();
-  }, [revision, token]);
+  }, [revision, token, view]);
 
   async function mutate(url: string, body?: object) {
     setBusy(true);
@@ -161,7 +162,9 @@ export function Schedule({ teacher, token, view }: { teacher: boolean; token: st
               <li key={booking.id} className="item-row lesson-row">
                 <div>
                   <p className="item-title"><time dateTime={booking.startsAt}>{display.formatRange(new Date(booking.startsAt), new Date(booking.endsAt))}</time></p>
-                  {booking.studentReference && <p className="muted">Student ID {booking.studentReference}</p>}
+                  {booking.studentReference && <p className="muted">
+                    {booking.studentDisplayName ?? `Student ID ${booking.studentReference}`}
+                  </p>}
                 </div>
                 {!teacher && (cancelling === booking.id ? (
                   <div className="confirmation">

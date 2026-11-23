@@ -1,8 +1,12 @@
 import { PrismaClient } from '@prisma/client';
 import Fastify from 'fastify';
 import { authRoutes } from './auth.js';
+import { creditRoutes } from './credit-routes.js';
+import { creditLedger } from './credits.js';
 import { invitations } from './invitations.js';
 import { scheduleRoutes } from './schedule.js';
+import { studentRoutes } from './student-routes.js';
+import { studentRoster } from './students.js';
 
 const app = Fastify({
   logger: true,
@@ -32,6 +36,16 @@ app.register(authRoutes, {
 });
 app.addHook('onClose', () => prisma.$disconnect());
 app.register(scheduleRoutes, { prefix: '/api/schedule', prisma, secret });
+app.register(studentRoutes, {
+  prefix: '/api/students',
+  secret,
+  roster: studentRoster(prisma),
+  findRole: async (id) => (await prisma.user.findUnique({ where: { id }, select: { role: true } }))?.role ?? null,
+});
+app.register(creditRoutes, {
+  prefix: '/api/credits', secret, ledger: creditLedger(prisma),
+  findAccount: (id) => prisma.user.findUnique({ where: { id }, select }),
+});
 
 try {
   await app.listen({ host: process.env.API_HOST ?? '127.0.0.1', port: 3000 });

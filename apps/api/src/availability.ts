@@ -137,13 +137,13 @@ export function availability(prisma: PrismaClient) {
         orderBy: { slot: { startsAt: 'asc' } },
         select: {
           id: true, slotId: true, slot: { select: { startsAt: true, endsAt: true, timeZone: true } },
-          student: { select: { id: true, telegramId: true } },
+          student: teacher ? { select: { id: true, telegramId: true, displayName: true } } : false,
         },
       });
       return bookings.map(({ id, slotId, slot, student }) => ({
         id, slotId, startsAt: slot.startsAt, endsAt: slot.endsAt,
-        ...(teacher
-          ? { studentReference: student.telegramId?.toString() ?? student.id }
+        ...(student
+          ? { studentReference: student.telegramId?.toString() ?? student.id, studentDisplayName: student.displayName }
           : { cancellationChargeApplies: sameLessonDay(now, slot.startsAt, slot.timeZone) }),
       }));
     },

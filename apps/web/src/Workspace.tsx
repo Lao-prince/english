@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Schedule } from './Schedule';
 import { StudentInvitations } from './StudentInvitations';
+import { StudentRoster } from './StudentRoster';
+import { CreditLedger } from './CreditLedger';
 import { Badge, Icon } from './ui';
 
 const views = [
@@ -74,7 +76,11 @@ export function Workspace({ teacher, token }: { teacher: boolean; token: string 
           <h1 ref={heading} tabIndex={-1}>{current.title}</h1>
         </div>
         <Schedule teacher={teacher} token={token} view={current.id} />
-        {teacher && <div hidden={current.id !== 'students'}><StudentInvitations token={token} /></div>}
+        {!teacher && current.id === 'lessons' && <div className="lesson-credits"><CreditLedger token={token} /></div>}
+        {teacher && <div className="schedule-grid" hidden={current.id !== 'students'}>
+          <StudentInvitations token={token} />
+          <StudentRoster active={current.id === 'students'} token={token} />
+        </div>}
       </main>
     </div>
   );

@@ -135,7 +135,8 @@ h2 { font-size: var(--text-section); font-weight: 650; line-height: 1.25; }
 .empty, .loading { display: flex; align-items: center; gap: var(--space-3); background: var(--surface-secondary); }
 .loading { color: var(--text-secondary); font-size: var(--text-small); }
 .skeleton { inline-size: 1rem; block-size: 1rem; border-radius: var(--radius-control); background: var(--input-border); }
-.invitation-panel { max-inline-size: var(--reading-width); }
+.invitation-panel { align-self: start; max-inline-size: var(--reading-width); }
+.lesson-credits { margin-block-start: var(--space-6); }
 .invitation-result { border-block-start: var(--border-width) solid var(--border); padding-block-start: var(--space-4); }
 .access { display: grid; align-content: center; gap: var(--space-6); inline-size: min(100%, var(--reading-width)); margin-inline: auto; padding: var(--space-8) var(--gutter); }
 .access-panel { box-shadow: var(--shadow); }
