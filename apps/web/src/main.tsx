@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { Schedule } from './Schedule';
 import './styles.css';
 
 declare global {
@@ -99,12 +100,7 @@ function App() {
     <main className="mx-auto grid min-h-dvh max-w-xl content-center px-6 py-12">
       <h1 className="text-4xl font-semibold tracking-tight">English Space</h1>
       {view.state === 'signed-in' ? (
-        <section className="mt-8 rounded-2xl border border-slate-200 p-5 dark:border-slate-800">
-          <h2 className="text-xl font-semibold">{teacher ? 'Teaching workspace' : 'Your lessons'}</h2>
-          <p className="mt-2 text-slate-600 dark:text-slate-300">
-            {teacher ? 'Scheduling will appear here when it becomes available.' : 'Your upcoming lessons will appear here once booking opens.'}
-          </p>
-        </section>
+        <Schedule teacher={teacher} token={readToken()} />
       ) : (
         <p role="status" className="mt-4 text-lg text-slate-600 dark:text-slate-300">{messages[view.state]}</p>
       )}

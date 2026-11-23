@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import Fastify from 'fastify';
 import { authRoutes } from './auth.js';
+import { scheduleRoutes } from './schedule.js';
 
 const app = Fastify({
   logger: true,
@@ -27,6 +28,7 @@ app.register(authRoutes, {
   findById: (id) => prisma.user.findUnique({ where: { id }, select }),
 });
 app.addHook('onClose', () => prisma.$disconnect());
+app.register(scheduleRoutes, { prefix: '/api/schedule', prisma, secret });
 
 try {
   await app.listen({ host: process.env.API_HOST ?? '127.0.0.1', port: 3000 });

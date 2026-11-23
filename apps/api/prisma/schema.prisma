@@ -19,3 +19,13 @@ model User {
   createdAt  DateTime @default(now()) @db.Timestamptz(3)
   updatedAt  DateTime @updatedAt @db.Timestamptz(3)
 }
+
+model AvailabilitySlot {
+  id       String    @id @db.Uuid
+  startsAt DateTime  @db.Timestamptz(3)
+  endsAt   DateTime  @db.Timestamptz(3)
+  timeZone String
+  closedAt DateTime? @db.Timestamptz(3)
+
+  @@index([startsAt])
+}

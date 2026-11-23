@@ -27,6 +27,8 @@ erDiagram
 
 ## Planned constraints
 
+The availability migration adds one-off slots. PostgreSQL rejects overlapping open intervals with a partial exclusion constraint. See [the availability contract](SCHEDULE.md).
+
 - Use UUID primary keys, foreign keys, creation and update timestamps, and a unique nullable Telegram ID. Index teacher availability by start time and student records by owner and date.
 - Store instants in PostgreSQL timestamptz. Store the teacher's IANA time zone separately for local calendar input. Validate that end time follows start time, and decide how recurring slots cross daylight-saving changes.
 - Use a PostgreSQL partial unique index on slot ID for active bookings. Make booking creation and slot checks transactional, and serialize booking against slot closure. Return a conflict when a slot is already booked. Preserve historical bookings when a student cancels and define the occupied states in the migration.
