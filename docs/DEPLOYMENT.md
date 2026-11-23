@@ -72,6 +72,8 @@ docker compose -p english-space exec api npm run user:provision -- teacher YOUR_
 docker compose -p english-space exec api npm run user:provision -- student STUDENT_TELEGRAM_ID
 ```
 
+After provisioning the teacher, new students can join using invitations issued in the Mini App. See [Student invitations](INVITATIONS.md) for optional direct-link setup.
+
 ## Stop or update
 
 ```sh

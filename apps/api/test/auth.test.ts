@@ -10,14 +10,16 @@ const botToken = 'synthetic-test-key';
 const secret = 'synthetic-session-key';
 const student = { id: '00000000-0000-4000-8000-000000000001', role: 'STUDENT' } as const;
 
-function launch(telegramId: number, date: number) {
+function launch(telegramId: number, date: number, startParam?: string) {
   const fields = new URLSearchParams({
     auth_date: String(date),
     signature: 'synthetic',
     user: JSON.stringify({ id: telegramId }),
   });
   const key = createHmac('sha256', 'WebAppData').update(botToken).digest();
-  const check = `auth_date=${date}\nsignature=synthetic\nuser=${fields.get('user')}`;
+  if (startParam) fields.set('start_param', startParam);
+  fields.sort();
+  const check = [...fields].map(([name, value]) => `${name}=${value}`).join('\n');
   fields.set('hash', createHmac('sha256', key).update(check).digest('hex'));
   return fields.toString();
 }
@@ -30,6 +32,43 @@ test('Telegram launch validation rejects forged, expired, future and duplicate f
   assert.equal(verifyTelegramId(launch(1, now - 301), botToken, now), null);
   assert.equal(verifyTelegramId(launch(1, now + 31), botToken, now), null);
   assert.equal(verifyTelegramId(valid + '&user=duplicate', botToken, now), null);
+});
+
+test('teachers issue invites and verified Telegram launches redeem them', async (t) => {
+  const app = Fastify();
+  t.after(() => app.close());
+  const teacher = { id: '00000000-0000-4000-8000-000000000002', role: 'TEACHER' } as const;
+  const code = 'invite_abcdefghijklmnopqrstuvwx';
+  const now = Math.floor(Date.now() / 1000);
+  let redeemed = false;
+  app.register(authRoutes, {
+    botToken, secret, botUsername: 'SyntheticBot',
+    findById: async (id) => id === teacher.id ? teacher : student,
+    findByTelegramId: async (id) => id === 1n ? teacher : id === 2n && redeemed ? student : null,
+    invitations: {
+      create: async () => ({ code, expiresAt: new Date() }),
+      redeem: async (submitted, id) => {
+        if (submitted !== code || redeemed) return null;
+        assert.equal(id, 2n);
+        redeemed = true;
+        return student;
+      },
+    },
+  });
+  const create = (id: string) => app.inject({
+    method: 'POST', url: '/invitations', headers: { authorization: `Bearer ${issueSession(id, secret, now)}` },
+  });
+  const signIn = (initData: string) => app.inject({ method: 'POST', url: '/telegram', payload: { initData } });
+  assert.equal((await create(student.id)).statusCode, 403);
+  const created = await create(teacher.id);
+  assert.equal(created.statusCode, 201);
+  assert.equal(created.json().link, `https://t.me/SyntheticBot?startapp=${code}`);
+  assert.equal((await signIn(launch(2, now) + '&start_param=' + code)).statusCode, 401);
+  assert.equal((await signIn(launch(1, now, code))).statusCode, 200);
+  assert.equal(redeemed, false);
+  assert.equal((await signIn(launch(2, now, code))).statusCode, 200);
+  assert.equal((await signIn(launch(2, now))).statusCode, 200);
+  assert.equal((await signIn(launch(3, now, code))).statusCode, 403);
 });
 
 test('session claims expire and cannot be altered', () => {

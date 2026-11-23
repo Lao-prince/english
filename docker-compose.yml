@@ -64,6 +64,7 @@ services:
       DATABASE_URL: *database-url
       SESSION_SECRET: "${SESSION_SECRET:?Set SESSION_SECRET in .env}"
       TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:?Set TELEGRAM_BOT_TOKEN in .env}"
+      TELEGRAM_BOT_USERNAME: "${TELEGRAM_BOT_USERNAME:-}"
     depends_on:
       migrate:
         condition: service_completed_successfully

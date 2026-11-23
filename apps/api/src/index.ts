@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import Fastify from 'fastify';
 import { authRoutes } from './auth.js';
+import { invitations } from './invitations.js';
 import { scheduleRoutes } from './schedule.js';
 
 const app = Fastify({
@@ -24,6 +25,8 @@ app.register(authRoutes, {
   prefix: '/api/auth',
   botToken,
   secret,
+  invitations: invitations(prisma),
+  botUsername: process.env.TELEGRAM_BOT_USERNAME?.trim(),
   findByTelegramId: (telegramId) => prisma.user.findUnique({ where: { telegramId }, select }),
   findById: (id) => prisma.user.findUnique({ where: { id }, select }),
 });

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Schedule } from './Schedule';
+import { StudentInvitations } from './StudentInvitations';
 import './styles.css';
 
 declare global {
@@ -11,7 +12,7 @@ declare global {
 
 type Account = { id: string; role: 'TEACHER' | 'STUDENT' };
 type View =
-  | { state: 'loading' | 'browser' | 'pending' | 'expired' | 'error' }
+  | { state: 'loading' | 'browser' | 'pending' | 'invalid-invite' | 'expired' | 'error' }
   | { state: 'signed-in'; account: Account };
 
 const sessionKey = 'english-space.session';
@@ -42,19 +43,20 @@ function fetchAccount(signal: AbortSignal) {
   });
 }
 
-async function loadAccount(initData: string, signal: AbortSignal): Promise<View> {
-  let response = await fetchAccount(signal);
-  if (response.status === 401) {
+async function loadAccount(initData: string, inviteCode: string, signal: AbortSignal): Promise<View> {
+  const hasInvitation = !!(inviteCode || new URLSearchParams(initData).get('start_param')?.startsWith('invite_'));
+  let response = hasInvitation ? undefined : await fetchAccount(signal);
+  if (!response || response.status === 401) {
     saveToken('');
     if (!initData) return { state: 'browser' };
 
     const signIn = await fetch('/api/auth/telegram', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ initData }),
+      body: JSON.stringify({ initData, inviteCode: inviteCode || undefined }),
       signal,
     });
-    if (signIn.status === 403) return { state: 'pending' };
+    if (signIn.status === 403) return { state: hasInvitation ? 'invalid-invite' : 'pending' };
     if (signIn.status === 401) return { state: 'expired' };
     if (!signIn.ok) return { state: 'error' };
     const session: { token: string } = await signIn.json();
@@ -71,7 +73,8 @@ async function loadAccount(initData: string, signal: AbortSignal): Promise<View>
 const messages = {
   loading: 'Checking access…',
   browser: 'Open English Space from the Telegram bot to sign in.',
-  pending: 'Ask your teacher to approve your Telegram account, then reopen English Space.',
+  pending: 'Enter the invitation code from your teacher.',
+  'invalid-invite': 'This invitation is invalid, expired, or already used. Ask your teacher for a new one.',
   expired: 'Close and reopen English Space in Telegram to refresh your sign-in.',
   error: 'English Space could not sign you in. Please try again.',
 };
@@ -79,12 +82,14 @@ const messages = {
 function App() {
   const [view, setView] = useState<View>({ state: 'loading' });
   const [attempt, setAttempt] = useState(0);
+  const [code, setCode] = useState('');
+  const [submittedCode, setSubmittedCode] = useState('');
 
   useEffect(() => {
     const controller = new AbortController();
     const telegram = window.Telegram?.WebApp;
     telegram?.ready();
-    loadAccount(telegram?.initData ?? '', controller.signal)
+    loadAccount(telegram?.initData ?? '', submittedCode, controller.signal)
       .then((next) => {
         if (!controller.signal.aborted) setView(next);
       })
@@ -92,7 +97,7 @@ function App() {
         if (!controller.signal.aborted) setView({ state: 'error' });
       });
     return () => controller.abort();
-  }, [attempt]);
+  }, [attempt, submittedCode]);
 
   const teacher = view.state === 'signed-in' && view.account.role === 'TEACHER';
 
@@ -100,9 +105,29 @@ function App() {
     <main className="mx-auto grid min-h-dvh max-w-xl content-center px-6 py-12">
       <h1 className="text-4xl font-semibold tracking-tight">English Space</h1>
       {view.state === 'signed-in' ? (
-        <Schedule teacher={teacher} token={readToken()} />
+        <>
+          <p className="mt-2">{teacher ? 'Teacher workspace' : 'Student workspace'}</p>
+          <Schedule teacher={teacher} token={readToken()} />
+          {teacher && <StudentInvitations token={readToken()} />}
+        </>
       ) : (
         <p role="status" className="mt-4 text-lg text-slate-600 dark:text-slate-300">{messages[view.state]}</p>
+      )}
+      {(view.state === 'pending' || view.state === 'invalid-invite') && (
+        <form className="mt-5 grid gap-3" onSubmit={(event) => {
+          event.preventDefault();
+          setView({ state: 'loading' });
+          setSubmittedCode(code.trim());
+          setAttempt((value) => value + 1);
+        }}>
+          <label className="grid gap-1">
+            Invitation code
+            <input className="min-w-0 rounded-lg border border-current p-2" required
+              autoCapitalize="none" spellCheck={false} pattern="invite_[A-Za-z0-9_\-]{24}"
+              value={code} onChange={(event) => setCode(event.target.value)} />
+          </label>
+          <button type="submit" className="w-fit rounded-lg border border-current px-4 py-2">Join as student</button>
+        </form>
       )}
       {view.state === 'error' && (
         <button

@@ -27,6 +27,8 @@ erDiagram
 
 ## Planned constraints
 
+Student invitations store a hashed code, expiry and redemption time. Redemption and student account creation are atomic. See [Student invitations](INVITATIONS.md).
+
 The availability migration adds one-off slots. PostgreSQL rejects overlapping open intervals with a partial exclusion constraint. See [the availability contract](SCHEDULE.md).
 
 - Use UUID primary keys, foreign keys, creation and update timestamps, and a unique nullable Telegram ID. Index teacher availability by start time and student records by owner and date.
