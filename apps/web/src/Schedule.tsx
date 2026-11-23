@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 type Slot = { id: string; startsAt: string; endsAt: string; timeZone: string };
+type Booking = Pick<Slot, 'id' | 'startsAt' | 'endsAt'> & {
+  slotId: string; studentReference?: string; cancellationChargeApplies?: boolean;
+};
 const endpoint = '/api/schedule/slots';
 const viewerZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const display = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
@@ -8,6 +11,10 @@ const button = 'rounded-lg border border-current px-3 py-2 font-medium disabled:
 
 export function Schedule({ teacher, token }: { teacher: boolean; token: string }) {
   const [slots, setSlots] = useState<Slot[] | null>(null);
+  const [bookings, setBookings] = useState<Booking[] | null>(null);
+  const [selected, setSelected] = useState<{ slotId: string; requestId: string } | null>(null);
+  const [cancelling, setCancelling] = useState<string | null>(null);
+  const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [revision, setRevision] = useState(0);
@@ -17,11 +24,15 @@ export function Schedule({ teacher, token }: { teacher: boolean; token: string }
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(endpoint, { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) throw new Error();
-        const list: Slot[] = await response.json();
-        if (!controller.signal.aborted) setSlots(list);
+    const options = { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal };
+    Promise.all([fetch(endpoint, options), fetch('/api/schedule/bookings', options)])
+      .then(async ([available, upcoming]) => {
+        if (!available.ok || !upcoming.ok) throw new Error();
+        const [slotList, bookingList] = await Promise.all([available.json(), upcoming.json()]);
+        if (!controller.signal.aborted) {
+          setSlots(slotList);
+          setBookings(bookingList);
+        }
       })
       .catch(() => {
         if (!controller.signal.aborted) setError('Could not load the schedule. Refresh to try again.');
@@ -32,6 +43,7 @@ export function Schedule({ teacher, token }: { teacher: boolean; token: string }
   async function mutate(url: string, body?: object) {
     setBusy(true);
     setError('');
+    setNotice('');
     try {
       const headers = new Headers({ Authorization: `Bearer ${token}` });
       if (body) headers.set('Content-Type', 'application/json');
@@ -39,13 +51,14 @@ export function Schedule({ teacher, token }: { teacher: boolean; token: string }
       if (!response.ok) {
         const result: { message?: string } = await response.json();
         setError(response.status < 500 && result.message ? result.message : 'Could not save the schedule. Try again.');
-        return false;
+        if (response.status === 409) setRevision((value) => value + 1);
+        return null;
       }
       setRevision((value) => value + 1);
-      return true;
+      return response;
     } catch {
       setError('Could not reach the server. Try again.');
-      return false;
+      return null;
     } finally {
       setBusy(false);
     }
@@ -98,6 +111,7 @@ export function Schedule({ teacher, token }: { teacher: boolean; token: string }
         </form>
       )}
       {error && <p role="alert">{error}</p>}
+      {notice && <p role="status">{notice}</p>}
       {slots === null && !error && <p role="status">Loading the schedule…</p>}
       {slots?.length === 0 && <p>No upcoming times are open.</p>}
       {!!slots?.length && (
@@ -105,13 +119,71 @@ export function Schedule({ teacher, token }: { teacher: boolean; token: string }
           {slots.map((slot) => (
             <li key={slot.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
               <span>{display.formatRange(new Date(slot.startsAt), new Date(slot.endsAt))}</span>
-              {teacher && <button className={button} type="button" disabled={busy}
+              {teacher ? <button className={button} type="button" disabled={busy}
                 aria-label={`Close slot at ${display.format(new Date(slot.startsAt))}`}
-                onClick={() => void mutate(`${endpoint}/${slot.id}/close`)}>Close</button>}
+                onClick={() => void mutate(`${endpoint}/${slot.id}/close`)}>Close</button>
+                : selected?.slotId === slot.id ? (
+                  <div className="flex flex-wrap gap-2">
+                    <button className={button} type="button" disabled={busy} onClick={async () => {
+                      if (await mutate(`${endpoint}/${slot.id}/book?requestId=${selected.requestId}`)) {
+                        setSelected(null);
+                        setNotice('Lesson booked.');
+                      }
+                    }}>Confirm booking</button>
+                    <button className={button} type="button" disabled={busy} onClick={() => setSelected(null)}>Back</button>
+                  </div>
+                ) : <button className={button} type="button" disabled={busy}
+                  aria-label={`Book lesson at ${display.format(new Date(slot.startsAt))}`}
+                  onClick={() => {
+                    setSelected({ slotId: slot.id, requestId: crypto.randomUUID() });
+                    setNotice('');
+                    setError('');
+                  }}>Book</button>}
             </li>
           ))}
         </ul>
       )}
+      <section aria-labelledby="upcoming-heading" className="space-y-2 border-t border-slate-200 pt-4 dark:border-slate-800">
+        <h3 id="upcoming-heading" className="text-lg font-semibold">Upcoming lessons</h3>
+        {bookings?.length === 0 && <p>No lessons are booked yet.</p>}
+        {!!bookings?.length && (
+          <ul className="divide-y divide-slate-200 dark:divide-slate-800">
+            {bookings.map((booking) => (
+              <li key={booking.id} className="py-3">
+                <p>{display.formatRange(new Date(booking.startsAt), new Date(booking.endsAt))}</p>
+                {booking.studentReference && <p className="break-all text-sm">Student ID {booking.studentReference}</p>}
+                {!teacher && (cancelling === booking.id ? (
+                  <div className="mt-2 space-y-2">
+                    <p>
+                      {booking.cancellationChargeApplies
+                        ? 'This is the lesson day in the teacher’s time zone. Cancelling will count as a paid lesson.'
+                        : 'You can cancel without a charge before the lesson day in the teacher’s time zone.'}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" className={button} disabled={busy} onClick={async () => {
+                        const response = await mutate(`/api/schedule/bookings/${booking.id}/cancel`, {
+                          acceptSameDayCharge: booking.cancellationChargeApplies === true,
+                        });
+                        if (response) {
+                          const { chargeApplies }: { chargeApplies: boolean } = await response.json();
+                          setCancelling(null);
+                          setNotice(chargeApplies
+                            ? 'Lesson cancelled. Recorded as chargeable.'
+                            : 'Lesson cancelled without a charge.');
+                        }
+                      }}>{booking.cancellationChargeApplies ? 'Cancel and accept charge' : 'Confirm cancellation'}</button>
+                      <button type="button" className={button} disabled={busy}
+                        onClick={() => setCancelling(null)}>Keep lesson</button>
+                    </div>
+                  </div>
+                ) : <button type="button" className={`mt-2 ${button}`} disabled={busy}
+                  aria-label={`Cancel lesson at ${display.format(new Date(booking.startsAt))}`}
+                  onClick={() => { setCancelling(booking.id); setNotice(''); setError(''); }}>Cancel lesson</button>)}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </section>
   );
 }

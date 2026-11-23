@@ -48,4 +48,4 @@ Start with `docker compose -p english-space up -d --wait` after validating the c
 - `docs` contains the [product and MVP](docs/PRODUCT.md), [architecture](docs/ARCHITECTURE.md), [database model](docs/DATABASE.md), [user flows and open questions](docs/USER_FLOWS.md), [roadmap](docs/ROADMAP.md) and [decisions](docs/DECISIONS.md).
 - [AGENTS.md](AGENTS.md) records development instructions.
 
-The app supports Telegram authentication and one-off availability. Teachers can publish or close slots, and students can see upcoming times in their local time zone. See the [availability contract](docs/SCHEDULE.md) and [roadmap](docs/ROADMAP.md) for booking and the first pilot.
+The app supports Telegram authentication, student invitations and [one-off availability](docs/SCHEDULE.md). Students can [book a slot](docs/BOOKING.md) and see their upcoming lessons in local time. The teacher can view all upcoming reservations. See the [roadmap](docs/ROADMAP.md) for cancellation and the first pilot.

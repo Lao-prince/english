@@ -1,6 +1,6 @@
 # Phase 2 availability
 
-The teacher publishes and closes one-off slots. Approved students see upcoming open slots in their device time zone. Booking, lessons and cancellation policies follow in the next slice.
+The teacher publishes and closes one-off slots. Approved students see upcoming open slots in their device time zone. See [Student booking](BOOKING.md) for reservations and how booking affects availability.
 
 An open slot can become closed. Closing is terminal and safe to retry. Slots start in the future, have a positive duration, and open intervals cannot overlap. Adjacent intervals may touch. The calendar form uses the teacher's device IANA zone and submits an explicit UTC instant. The slot retains the input zone. A nonexistent local time is rejected by the form. When a local time occurs twice, the form uses the earlier instant.
 

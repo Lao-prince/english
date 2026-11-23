@@ -27,6 +27,8 @@ erDiagram
 
 ## Planned constraints
 
+Bookings use a partial unique index on the slot to allow one active reservation and retain cancelled reservations. Cancellation persists whether a lesson is chargeable for later credit settlement. Serializing calendar writes protects booking against concurrent closure and cancellation. See [Student booking](BOOKING.md).
+
 Student invitations store a hashed code, expiry and redemption time. Redemption and student account creation are atomic. See [Student invitations](INVITATIONS.md).
 
 The availability migration adds one-off slots. PostgreSQL rejects overlapping open intervals with a partial exclusion constraint. See [the availability contract](SCHEDULE.md).
