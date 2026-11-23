@@ -3,12 +3,12 @@ import { Schedule } from './Schedule';
 import { StudentInvitations } from './StudentInvitations';
 import { StudentRoster } from './StudentRoster';
 import { CreditLedger } from './CreditLedger';
-import { Badge, Icon } from './ui';
+import { Badge, fieldValidation, Icon } from './ui';
 
 const views = [
-  { id: 'schedule', label: 'Schedule', title: 'Schedule' },
-  { id: 'lessons', label: 'Lessons', title: 'Upcoming lessons' },
-  { id: 'students', label: 'Students', title: 'Students' },
+  { id: 'schedule', label: 'Расписание', title: 'Расписание' },
+  { id: 'lessons', label: 'Уроки', title: 'Предстоящие уроки' },
+  { id: 'students', label: 'Ученики', title: 'Ученики' },
 ] as const;
 type ViewId = typeof views[number]['id'];
 const readView = () => new URLSearchParams(window.location.search).get('view');
@@ -53,7 +53,7 @@ export function Workspace({ teacher, token }: { teacher: boolean; token: string 
       <header className="app-header">
         <div className="header-inner">
           <Brand />
-          <nav className="app-nav" aria-label="Workspace">
+          <nav className="app-nav" aria-label="Разделы приложения">
             {allowed.map(({ id, label }) => (
               <a href={viewUrl(id).href} key={id} aria-current={current.id === id ? 'page' : undefined}
                 onClick={(event) => {
@@ -64,14 +64,14 @@ export function Workspace({ teacher, token }: { teacher: boolean; token: string 
                   moveFocus.current = true;
                   setRequested(id);
                 }}>
-                <Icon name={id} /><span>{label}</span>
+                <span className="nav-icon"><Icon name={id} /></span><span>{label}</span>
               </a>
             ))}
           </nav>
-          <Badge>{teacher ? 'Teacher' : 'Student'}</Badge>
+          <Badge>{teacher ? 'Преподаватель' : 'Ученик'}</Badge>
         </div>
       </header>
-      <main className="content" id="main-content">
+      <main className="content" id="main-content" {...fieldValidation}>
         <div className="page-heading">
           <h1 ref={heading} tabIndex={-1}>{current.title}</h1>
         </div>

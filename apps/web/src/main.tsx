@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Brand, Workspace } from './Workspace';
-import { Button, Field, LoadingState, Notice, Panel } from './ui';
+import { Button, Field, fieldValidation, LoadingState, Notice, Panel } from './ui';
+import { applyTelegramTheme, clearTelegramTheme, type ThemeParams } from './telegramTheme';
 import './styles.css';
 
 declare global {
@@ -10,9 +11,10 @@ declare global {
       initData: string;
       ready(): void;
       colorScheme?: 'light' | 'dark';
+      themeParams?: ThemeParams;
       viewportStableHeight?: number;
-      safeAreaInset?: { bottom: number };
-      contentSafeAreaInset?: { bottom: number };
+      safeAreaInset?: { top?: number; bottom: number };
+      contentSafeAreaInset?: { top?: number; bottom: number };
       onEvent?(event: string, callback: () => void): void;
       offEvent?(event: string, callback: () => void): void;
     } };
@@ -80,12 +82,21 @@ async function loadAccount(initData: string, inviteCode: string, signal: AbortSi
 }
 
 const messages = {
-  loading: 'Checking access…',
-  browser: 'Open English Space from the Telegram bot to sign in.',
-  pending: 'Enter the invitation code from your teacher.',
-  'invalid-invite': 'This invitation is invalid, expired, or already used. Ask your teacher for a new one.',
-  expired: 'Close and reopen English Space in Telegram to refresh your sign-in.',
-  error: 'English Space could not sign you in. Please try again.',
+  loading: 'Проверяем доступ…',
+  browser: 'Чтобы войти, откройте English Space из меню бота в Telegram.',
+  pending: 'Введите код, который прислал преподаватель.',
+  'invalid-invite': 'Приглашение недействительно, просрочено или уже использовано. Попросите преподавателя прислать новое.',
+  expired: 'Закройте и снова откройте English Space в Telegram.',
+  error: 'Не удалось войти. Попробуйте ещё раз.',
+};
+
+const accessTitles = {
+  loading: 'Вход в приложение',
+  browser: 'Откройте в Telegram',
+  pending: 'Принять приглашение',
+  'invalid-invite': 'Принять приглашение',
+  expired: 'Сеанс истёк',
+  error: 'Не удалось войти',
 };
 
 function App() {
@@ -101,9 +112,12 @@ function App() {
     const html = document.documentElement;
     const update = () => {
       html.dataset.theme = miniApp?.colorScheme ?? (systemTheme.matches ? 'dark' : 'light');
+      applyTelegramTheme(html, miniApp?.themeParams);
       if (miniApp?.viewportStableHeight) html.style.setProperty('--app-height', `${miniApp.viewportStableHeight}px`);
       const bottom = (miniApp?.safeAreaInset?.bottom ?? 0) + (miniApp?.contentSafeAreaInset?.bottom ?? 0);
       html.style.setProperty('--telegram-bottom', `${bottom}px`);
+      const top = (miniApp?.safeAreaInset?.top ?? 0) + (miniApp?.contentSafeAreaInset?.top ?? 0);
+      html.style.setProperty('--telegram-top', `${top}px`);
     };
     const events = ['themeChanged', 'viewportChanged', 'safeAreaChanged', 'contentSafeAreaChanged'];
     update();
@@ -115,6 +129,8 @@ function App() {
       delete html.dataset.theme;
       html.style.removeProperty('--app-height');
       html.style.removeProperty('--telegram-bottom');
+      html.style.removeProperty('--telegram-top');
+      clearTelegramTheme(html);
     };
   }, []);
 
@@ -137,10 +153,10 @@ function App() {
   }
 
   return (
-    <main className="access">
+    <main className="access" {...fieldValidation}>
       <Brand />
       <Panel className="access-panel">
-        <h1>{view.state === 'pending' || view.state === 'invalid-invite' ? 'Join English Space' : 'English Space'}</h1>
+        <h1>{accessTitles[view.state]}</h1>
         {view.state === 'loading' ? <LoadingState label={messages.loading} /> :
           <Notice tone={view.state === 'error' || view.state === 'invalid-invite' ? 'danger' : 'info'}>{messages[view.state]}</Notice>}
         {(view.state === 'pending' || view.state === 'invalid-invite') && (
@@ -150,12 +166,12 @@ function App() {
             setSubmittedCode(code.trim());
             setAttempt((value) => value + 1);
           }}>
-            <Field label="Invitation code">
+            <Field label="Код приглашения">
               <input required
                 autoCapitalize="none" spellCheck={false} pattern="invite_[A-Za-z0-9_\-]{24}"
                 value={code} onChange={(event) => setCode(event.target.value)} />
             </Field>
-            <Button type="submit" variant="primary">Join as student</Button>
+            <Button type="submit" variant="primary">Войти как ученик</Button>
           </form>
         )}
         {view.state === 'error' && (
@@ -166,7 +182,7 @@ function App() {
               setAttempt(attempt + 1);
             }}
           >
-            Try again
+            Попробовать снова
           </Button>
         )}
       </Panel>

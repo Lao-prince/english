@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Button, Field, IconButton, LoadingState, Notice, Panel } from './ui';
+import { apiMessage } from './apiMessage';
 
 const labels = {
-  GRANT: 'Credits added',
-  COMPLETED_LESSON: 'Completed lesson',
-  SAME_DAY_CANCELLATION: 'Same-day cancellation',
+  GRANT: 'Пополнение баланса',
+  COMPLETED_LESSON: 'Проведённый урок',
+  SAME_DAY_CANCELLATION: 'Отмена в день урока',
 } as const;
 type Reason = keyof typeof labels;
 type Summary = {
@@ -12,7 +13,7 @@ type Summary = {
   entries: { id: string; amount: number; reason: Reason; createdAt: string }[];
   pending?: { bookingId: string; startsAt: string; reason: Exclude<Reason, 'GRANT'> }[];
 };
-const date = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+const date = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeStyle: 'short' });
 
 export function CreditLedger({ token, studentId }: { token: string; studentId?: string }) {
   const endpoint = studentId ? `/api/credits/students/${studentId}` : '/api/credits/me';
@@ -32,7 +33,7 @@ export function CreditLedger({ token, studentId }: { token: string; studentId?: 
         if (!controller.signal.aborted) setSummary(data);
       })
       .catch(() => {
-        if (!controller.signal.aborted) setFeedback({ tone: 'danger', text: 'Could not load lesson credits.' });
+        if (!controller.signal.aborted) setFeedback({ tone: 'danger', text: 'Не удалось загрузить баланс.' });
       });
     return () => controller.abort();
   }, [endpoint, revision, token]);
@@ -47,15 +48,14 @@ export function CreditLedger({ token, studentId }: { token: string; studentId?: 
         body: JSON.stringify(body),
       });
       if (!response.ok) {
-        const error: { message?: string } = await response.json();
-        throw new Error(response.status < 500 ? error.message : undefined);
+        setFeedback({ tone: 'danger', text: await apiMessage(response, 'Не удалось обновить баланс. Попробуйте ещё раз.') });
+        return false;
       }
       setFeedback({ tone: 'success', text });
       setRevision((value) => value + 1);
       return true;
-    } catch (error) {
-      setFeedback({ tone: 'danger', text: error instanceof Error && error.message
-        ? error.message : 'Could not update lesson credits. Try again.' });
+    } catch {
+      setFeedback({ tone: 'danger', text: 'Нет связи с сервером. Попробуйте ещё раз.' });
       return false;
     } finally {
       setBusy(false);
@@ -66,7 +66,7 @@ export function CreditLedger({ token, studentId }: { token: string; studentId?: 
     event.preventDefault();
     const value = Number(amount);
     if (grant.current?.amount !== value) grant.current = { id: crypto.randomUUID(), amount: value };
-    if (await save('grant', grant.current, 'Lesson credits added.')) {
+    if (await save('grant', grant.current, 'Занятия добавлены.')) {
       grant.current = null;
       setAmount('');
     }
@@ -76,47 +76,47 @@ export function CreditLedger({ token, studentId }: { token: string; studentId?: 
     <Panel>
       <div className="section-tools">
         <div>
-          <h2>Lesson credits</h2>
-          {summary && <p className="item-title">{summary.balance} available</p>}
+          <h2>Баланс занятий</h2>
+          {summary && <p className="item-title">Доступно занятий: {summary.balance}</p>}
         </div>
-        <IconButton icon="refresh" label="Refresh lesson credits" variant="quiet" disabled={busy}
+        <IconButton icon="refresh" label="Обновить баланс" variant="quiet" disabled={busy}
           onClick={() => { setFeedback(null); setRevision((value) => value + 1); }} />
       </div>
       {feedback && <Notice tone={feedback.tone}>{feedback.text}</Notice>}
-      {!summary && !feedback && <LoadingState label="Loading lesson credits…" />}
+      {!summary && !feedback && <LoadingState label="Загружаем баланс…" />}
       {studentId && summary && (
         <>
           <form className="form-stack" onSubmit={addCredits}>
-            <Field label="Credits to add">
+            <Field label="Сколько занятий добавить">
               <input type="number" min={1} max={100} step={1} required value={amount} disabled={busy}
                 onChange={(event) => setAmount(event.target.value)} />
             </Field>
-            <Button type="submit" variant="primary" disabled={busy}>Add credits</Button>
+            <Button type="submit" variant="primary" disabled={busy}>Добавить занятия</Button>
           </form>
-          <section aria-label="Lessons awaiting settlement">
-            <p className="item-title">Awaiting settlement</p>
+          <section aria-label="Уроки к списанию">
+            <p className="item-title">К списанию</p>
             {summary.pending?.length ? (
               <ul className="item-list">
                 {summary.pending.map((lesson) => (
                   <li key={lesson.bookingId} className="item-row">
                     <div>
-                      <p>{lesson.reason === 'COMPLETED_LESSON' ? 'Past lesson' : labels[lesson.reason]}</p>
+                      <p>{lesson.reason === 'COMPLETED_LESSON' ? 'Прошедший урок' : labels[lesson.reason]}</p>
                       <time className="muted" dateTime={lesson.startsAt}>{date.format(new Date(lesson.startsAt))}</time>
                     </div>
                     <Button disabled={busy || summary.balance === 0}
-                      onClick={() => void save('settle', { bookingId: lesson.bookingId }, 'One lesson credit used.')}>
-                      {lesson.reason === 'COMPLETED_LESSON' ? 'Mark complete and use 1 credit' : 'Use 1 credit'}
+                      onClick={() => void save('settle', { bookingId: lesson.bookingId }, 'Одно занятие списано.')}>
+                      {lesson.reason === 'COMPLETED_LESSON' ? 'Отметить проведённым и списать' : 'Списать одно занятие'}
                     </Button>
                   </li>
                 ))}
               </ul>
-            ) : <p className="muted">No lessons awaiting settlement.</p>}
-            {!!summary.pending?.length && summary.balance === 0 && <p className="muted">Add credits to settle these lessons.</p>}
+            ) : <p className="muted">Нет уроков к списанию.</p>}
+            {!!summary.pending?.length && summary.balance === 0 && <p className="muted">Чтобы списать занятие, пополните баланс.</p>}
           </section>
         </>
       )}
-      {summary && <section aria-label="Recent credit activity">
-        <p className="item-title">Recent activity</p>
+      {summary && <section aria-label="История операций">
+        <p className="item-title">История операций</p>
         {summary.entries.length ? <ul className="item-list">
           {summary.entries.map((entry) => (
             <li key={entry.id} className="item-row">
@@ -127,7 +127,7 @@ export function CreditLedger({ token, studentId }: { token: string; studentId?: 
               <strong>{entry.amount > 0 ? '+' : ''}{entry.amount}</strong>
             </li>
           ))}
-        </ul> : <p className="muted">No credit activity yet.</p>}
+        </ul> : <p className="muted">Операций пока нет.</p>}
       </section>}
     </Panel>
   );

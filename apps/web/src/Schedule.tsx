@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Button, EmptyState, Field, Icon, IconButton, LoadingState, Notice, Panel } from './ui';
+import { apiMessage } from './apiMessage';
 
 type Slot = { id: string; startsAt: string; endsAt: string; timeZone: string };
 type Booking = Pick<Slot, 'id' | 'startsAt' | 'endsAt'> & {
@@ -7,7 +8,9 @@ type Booking = Pick<Slot, 'id' | 'startsAt' | 'endsAt'> & {
 };
 const endpoint = '/api/schedule/slots';
 const viewerZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-const display = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+const viewerZoneLabel = new Intl.DateTimeFormat('ru-RU', { timeZone: viewerZone, timeZoneName: 'longGeneric' })
+  .formatToParts().find(({ type }) => type === 'timeZoneName')?.value ?? viewerZone;
+const display = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium', timeStyle: 'short' });
 
 export function Schedule({ teacher, token, view }: { teacher: boolean; token: string; view: 'schedule' | 'lessons' | 'students' }) {
   const [slots, setSlots] = useState<Slot[] | null>(null);
@@ -36,7 +39,7 @@ export function Schedule({ teacher, token, view }: { teacher: boolean; token: st
         }
       })
       .catch(() => {
-        if (!controller.signal.aborted) setError('Could not load the schedule. Refresh to try again.');
+        if (!controller.signal.aborted) setError('Не удалось загрузить расписание. Обновите его и попробуйте снова.');
       });
     return () => controller.abort();
   }, [revision, token, view]);
@@ -50,15 +53,14 @@ export function Schedule({ teacher, token, view }: { teacher: boolean; token: st
       if (body) headers.set('Content-Type', 'application/json');
       const response = await fetch(url, { method: 'POST', headers, body: body && JSON.stringify(body) });
       if (!response.ok) {
-        const result: { message?: string } = await response.json();
-        setError(response.status < 500 && result.message ? result.message : 'Could not save the schedule. Try again.');
+        setError(await apiMessage(response, 'Не удалось сохранить изменения. Попробуйте ещё раз.'));
         if (response.status === 409) setRevision((value) => value + 1);
         return null;
       }
       setRevision((value) => value + 1);
       return response;
     } catch {
-      setError('Could not reach the server. Try again.');
+      setError('Нет связи с сервером. Попробуйте ещё раз.');
       return null;
     } finally {
       setBusy(false);
@@ -71,7 +73,7 @@ export function Schedule({ teacher, token, view }: { teacher: boolean; token: st
     const pad = (value: number) => String(value).padStart(2, '0');
     const calendar = `${local.getFullYear()}-${pad(local.getMonth() + 1)}-${pad(local.getDate())}T${pad(local.getHours())}:${pad(local.getMinutes())}`;
     if (calendar !== start || !Number.isFinite(local.getTime())) {
-      setError('Choose a valid local date and time.');
+      setError('Укажите корректные дату и время.');
       return;
     }
 
@@ -85,10 +87,10 @@ export function Schedule({ teacher, token, view }: { teacher: boolean; token: st
   }
 
   return (
-    <section className="schedule-stack" hidden={view === 'students'} aria-label="Lesson schedule">
+    <section className="schedule-stack" hidden={view === 'students'} aria-label="Расписание уроков">
       <div className="section-tools">
-        <p className="muted">Times shown in <strong>{viewerZone}</strong></p>
-        <IconButton icon="refresh" label="Refresh schedule" variant="quiet" onClick={() => {
+        <p className="muted">Часовой пояс: <strong>{viewerZoneLabel}</strong></p>
+        <IconButton icon="refresh" label="Обновить расписание" variant="quiet" onClick={() => {
           setError('');
           setRevision((value) => value + 1);
         }} />
@@ -98,27 +100,27 @@ export function Schedule({ teacher, token, view }: { teacher: boolean; token: st
       <div className={teacher ? 'schedule-grid' : 'schedule-stack'} hidden={view !== 'schedule'}>
         {teacher && (
           <Panel className="slot-form">
-            <h2>Publish a slot</h2>
+            <h2>Добавить время</h2>
             <form onSubmit={publish}>
               <fieldset disabled={busy} className="form-stack">
-                <Field label="Start date and time">
+                <Field label="Дата и время начала">
                   <input type="datetime-local" required
                     value={start} onChange={(event) => setStart(event.target.value)} />
                 </Field>
-                <Field label="Duration in minutes">
+                <Field label="Длительность в минутах">
                   <input type="number" required min={1} max={1440}
                     value={duration} onChange={(event) => setDuration(event.target.value)} />
                 </Field>
-                <Button variant="primary" type="submit"><Icon name="plus" />Publish slot</Button>
+                <Button variant="primary" type="submit"><Icon name="plus" />Открыть запись</Button>
               </fieldset>
             </form>
           </Panel>
         )}
         <section aria-labelledby="availability-heading" className="list-section">
-          <h2 id="availability-heading">Available lesson times</h2>
-          {slots === null && !error && <LoadingState label="Loading the schedule…" />}
-          {slots?.length === 0 && <EmptyState icon="schedule" title="No upcoming times are open">
-            {teacher ? 'Publish a slot to open it for student booking.' : 'Check back when your teacher publishes a time.'}
+          <h2 id="availability-heading">Свободное время</h2>
+          {slots === null && !error && <LoadingState label="Загружаем расписание…" />}
+          {slots?.length === 0 && <EmptyState icon="schedule" title="Свободного времени пока нет">
+            {teacher ? 'Добавьте время, чтобы ученики могли записаться.' : 'Здесь появится время, которое откроет преподаватель.'}
           </EmptyState>}
           {!!slots?.length && (
             <ul className="item-list">
@@ -126,35 +128,35 @@ export function Schedule({ teacher, token, view }: { teacher: boolean; token: st
                 <li key={slot.id} className="item-row">
                   <p className="item-title"><time dateTime={slot.startsAt}>{display.formatRange(new Date(slot.startsAt), new Date(slot.endsAt))}</time></p>
                   {teacher ? <Button variant="quiet" disabled={busy}
-                    aria-label={`Close slot at ${display.format(new Date(slot.startsAt))}`}
-                    onClick={() => void mutate(`${endpoint}/${slot.id}/close`)}>Close</Button>
+                    aria-label={`Закрыть запись на ${display.format(new Date(slot.startsAt))}`}
+                    onClick={() => void mutate(`${endpoint}/${slot.id}/close`)}>Закрыть</Button>
                     : selected?.slotId === slot.id ? (
                       <div className="actions">
                         <Button variant="primary" disabled={busy} onClick={async () => {
                           if (await mutate(`${endpoint}/${slot.id}/book?requestId=${selected.requestId}`)) {
                             setSelected(null);
-                            setNotice('Lesson booked.');
+                            setNotice('Вы записаны на урок.');
                           }
-                        }}>Confirm booking</Button>
-                        <Button variant="quiet" disabled={busy} onClick={() => setSelected(null)}>Back</Button>
+                        }}>Подтвердить запись</Button>
+                        <Button variant="quiet" disabled={busy} onClick={() => setSelected(null)}>Назад</Button>
                       </div>
                     ) : <Button variant="primary" disabled={busy}
-                      aria-label={`Book lesson at ${display.format(new Date(slot.startsAt))}`}
+                      aria-label={`Записаться на урок на ${display.format(new Date(slot.startsAt))}`}
                       onClick={() => {
                         setSelected({ slotId: slot.id, requestId: crypto.randomUUID() });
                         setNotice('');
                         setError('');
-                      }}>Book <Icon name="arrow" /></Button>}
+                      }}>Записаться <Icon name="arrow" /></Button>}
                 </li>
               ))}
             </ul>
           )}
         </section>
       </div>
-      <section aria-label="Upcoming reservations" hidden={view !== 'lessons'}>
-        {bookings === null && !error && <LoadingState label="Loading upcoming lessons…" />}
-        {bookings?.length === 0 && <EmptyState icon="lessons" title="No lessons are booked yet">
-          Booked lessons will appear here.
+      <section aria-label="Предстоящие записи" hidden={view !== 'lessons'}>
+        {bookings === null && !error && <LoadingState label="Загружаем уроки…" />}
+        {bookings?.length === 0 && <EmptyState icon="lessons" title="Записей пока нет">
+          Здесь появятся предстоящие уроки.
         </EmptyState>}
         {!!bookings?.length && (
           <ul className="item-list">
@@ -163,15 +165,15 @@ export function Schedule({ teacher, token, view }: { teacher: boolean; token: st
                 <div>
                   <p className="item-title"><time dateTime={booking.startsAt}>{display.formatRange(new Date(booking.startsAt), new Date(booking.endsAt))}</time></p>
                   {booking.studentReference && <p className="muted">
-                    {booking.studentDisplayName ?? `Student ID ${booking.studentReference}`}
+                    {booking.studentDisplayName ?? `ID ученика: ${booking.studentReference}`}
                   </p>}
                 </div>
                 {!teacher && (cancelling === booking.id ? (
                   <div className="confirmation">
                     <Notice tone={booking.cancellationChargeApplies ? 'warning' : 'info'}>
                       {booking.cancellationChargeApplies
-                        ? 'This is the lesson day in the teacher’s time zone. Cancelling will count as a paid lesson.'
-                        : 'You can cancel without a charge before the lesson day in the teacher’s time zone.'}
+                        ? 'По времени преподавателя урок уже сегодня. При отмене он будет считаться оплаченным.'
+                        : 'До дня урока по времени преподавателя отмена бесплатна.'}
                     </Notice>
                     <div className="actions">
                       <Button variant="danger" disabled={busy} onClick={async () => {
@@ -182,16 +184,16 @@ export function Schedule({ teacher, token, view }: { teacher: boolean; token: st
                           const { chargeApplies }: { chargeApplies: boolean } = await response.json();
                           setCancelling(null);
                           setNotice(chargeApplies
-                            ? 'Lesson cancelled. Recorded as chargeable.'
-                            : 'Lesson cancelled without a charge.');
+                            ? 'Урок отменён. Отмена отмечена как платная.'
+                            : 'Урок отменён без списания.');
                         }
-                      }}>{booking.cancellationChargeApplies ? 'Cancel and accept charge' : 'Confirm cancellation'}</Button>
-                      <Button variant="quiet" disabled={busy} onClick={() => setCancelling(null)}>Keep lesson</Button>
+                      }}>{booking.cancellationChargeApplies ? 'Отменить со списанием' : 'Подтвердить отмену'}</Button>
+                      <Button variant="quiet" disabled={busy} onClick={() => setCancelling(null)}>Оставить урок</Button>
                     </div>
                   </div>
                 ) : <Button variant="quiet" disabled={busy}
-                  aria-label={`Cancel lesson at ${display.format(new Date(booking.startsAt))}`}
-                  onClick={() => { setCancelling(booking.id); setNotice(''); setError(''); }}>Cancel lesson</Button>)}
+                  aria-label={`Отменить урок на ${display.format(new Date(booking.startsAt))}`}
+                  onClick={() => { setCancelling(booking.id); setNotice(''); setError(''); }}>Отменить урок</Button>)}
               </li>
             ))}
           </ul>

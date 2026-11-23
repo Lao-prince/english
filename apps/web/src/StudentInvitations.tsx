@@ -19,7 +19,7 @@ export function StudentInvitations({ token }: { token: string }) {
       if (!response.ok) throw new Error();
       setInvitation(await response.json());
     } catch {
-      setMessage('Could not create an invitation. Try again.');
+      setMessage('Не удалось создать приглашение. Попробуйте ещё раз.');
     } finally {
       setBusy(false);
     }
@@ -28,30 +28,30 @@ export function StudentInvitations({ token }: { token: string }) {
   return (
     <Panel className="invitation-panel">
       <span className="icon-tile"><Icon name="students" /></span>
-      <h2>Invite a student</h2>
-      <p className="muted">Share an invitation to give a student access to English Space.</p>
+      <h2>Пригласить ученика</h2>
+      <p className="muted">Отправьте приглашение, чтобы ученик получил доступ к English Space.</p>
       <Button variant="primary" disabled={busy} onClick={() => void create()}>
         <Icon name="plus" />
-        {busy ? 'Creating invitation…' : 'Create student invitation'}
+        {busy ? 'Создаём приглашение…' : 'Создать приглашение'}
       </Button>
       {invitation && (
         <div className="invitation-result">
-          <p className="muted">Share privately. This invitation works once and expires {new Date(invitation.expiresAt).toLocaleString()}.</p>
-          <Field label={invitation.link ? 'Invitation link' : 'Invitation code'}>
+          <p className="muted">Отправьте приглашение в личном сообщении. Оно одноразовое и действует до {new Date(invitation.expiresAt).toLocaleString('ru-RU')}.</p>
+          <Field label={invitation.link ? 'Ссылка-приглашение' : 'Код приглашения'}>
             <input readOnly
               value={invitation.link ?? invitation.code} onFocus={(event) => event.target.select()} />
           </Field>
           <Button onClick={async () => {
             try {
               await navigator.clipboard.writeText(invitation.link ?? invitation.code);
-              setMessage('Invitation copied.');
+              setMessage('Приглашение скопировано.');
             } catch {
-              setMessage('Select the invitation text to copy it manually.');
+              setMessage('Выделите текст приглашения, чтобы скопировать его вручную.');
             }
-          }}><Icon name="copy" />Copy invitation</Button>
+          }}><Icon name="copy" />Скопировать приглашение</Button>
         </div>
       )}
-      {message && <Notice tone={message === 'Invitation copied.' ? 'success' : message.startsWith('Could not') ? 'danger' : 'info'}>{message}</Notice>}
+      {message && <Notice tone={message === 'Приглашение скопировано.' ? 'success' : message.startsWith('Не удалось') ? 'danger' : 'info'}>{message}</Notice>}
     </Panel>
   );
 }

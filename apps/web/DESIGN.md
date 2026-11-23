@@ -1,6 +1,16 @@
 # English Space interface
 
-## Audit and update plan
+## Pink redesign
+
+The existing workspace has Schedule, Upcoming lessons and Students, plus access and invitation states. Schedule includes publishing, booking and cancellation. Students includes invitations, roster editing and credit management. Students can see their own credit activity in Lessons. An audit found English copy and English server errors exposed directly in forms, a violet brand palette, and Telegram integration that only read the light or dark setting.
+
+The redesign starts with Schedule and its navigation and applies the same components to access, lessons, invitations, roster, and credits. Neutral surfaces, system sans-serif with Cyrillic support, quiet dividers, and pink `#FFCDE6` distinguish the selected destination and brand mark. Navigation uses a fixed bottom dock below 768px, a compact header on tablets, and a side rail from 1024px. Links keep their query destinations and role restrictions. Dates, messages, form validation, and accessible names use Russian.
+
+The brief's emphasis on typography, spacing, and restrained surfaces informed the design direction. [Spline One's design portfolio](https://www.behance.net/spline-one)
+
+The existing Telegram theme event refreshes the app's semantic color tokens. Accept background colors that work with the app's fallback text, then accept foreground colors that achieve 4.5:1 contrast on the selected surfaces. Adopt the Telegram button colors as a pair with the same threshold. The pink active marker uses its own dark foreground. In a browser, system appearance sets the base palette. [Telegram WebApp theme parameters](https://core.telegram.org/bots/webapps#themeparams)
+
+## Previous iteration
 
 The app started with one React entry point and one URL. Signed-out views covered loading, browser access, invitations, expiry and errors. The signed-in page stacked availability, upcoming lessons and, for teachers, invitations. Forms and actions repeated Tailwind classes, and the two schedule lists shared a single heading and loading treatment. Telegram provided the launch payload and ready notification. Browser visitors could open the same entry point.
 

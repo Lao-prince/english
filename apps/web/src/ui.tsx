@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import type { ButtonHTMLAttributes, FormEvent, ReactNode } from 'react';
 
 export const paths = {
   schedule: 'M7 3v4m10-4v4M4 10h16M6 5h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm2 9h2m4 0h2m-8 3h2',
@@ -27,6 +27,22 @@ export function IconButton({ icon, label, ...props }: ButtonProps & { icon: keyo
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className="field"><span>{label}</span>{children}</label>;
 }
+
+export const fieldValidation = {
+  onInvalid(event: FormEvent<HTMLElement>) {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) return;
+    const { valueMissing, patternMismatch, rangeUnderflow, rangeOverflow, stepMismatch } = input.validity;
+    if (valueMissing) input.setCustomValidity('Заполните это поле.');
+    else if (patternMismatch) input.setCustomValidity('Проверьте код приглашения.');
+    else if (rangeUnderflow || rangeOverflow) input.setCustomValidity(`Введите число от ${input.min} до ${input.max}.`);
+    else if (stepMismatch) input.setCustomValidity('Введите целое число.');
+    else input.setCustomValidity('Проверьте значение в этом поле.');
+  },
+  onInput(event: FormEvent<HTMLElement>) {
+    if (event.target instanceof HTMLInputElement) event.target.setCustomValidity('');
+  },
+};
 
 export function Badge({ children }: { children: ReactNode }) {
   return <span className="badge">{children}</span>;
