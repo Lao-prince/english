@@ -129,6 +129,9 @@ h2 { color: var(--section-title); font-size: var(--text-section); font-weight: 6
 .section-tools { justify-content: space-between; }
 .schedule-grid { display: grid; gap: var(--space-6); }
 .item-list { list-style: none; padding: 0; margin: 0; border-block-start: var(--border-width) solid var(--border); }
+.schedule-days { display: grid; gap: var(--space-6); }
+.schedule-day-title { color: var(--subtitle); font-size: var(--text-small); font-weight: 650; margin-block-end: var(--space-2); }
+.schedule-day-title::first-letter { text-transform: uppercase; }
 .item-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); padding-block: var(--space-4); border-block-end: var(--border-width) solid var(--border); overflow-wrap: anywhere; }
 .confirmation { display: grid; gap: var(--space-2); flex-basis: 100%; }
 .notice, .loading, .empty { padding: var(--space-4); border-radius: var(--radius-control); }

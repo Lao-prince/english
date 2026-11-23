@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { creditLedger } from './credits.js';
+import type { PackageTerms } from './credit-package.js';
 import { readSession } from './session.js';
 
 type Account = { id: string; role: 'TEACHER' | 'STUDENT' };
@@ -31,17 +32,33 @@ export async function creditRoutes(app: FastifyInstance, { secret, ledger, findA
   app.get<{ Params: { id: string } }>('/students/:id', {
     onRequest: teacherOnly, schema: { params },
   }, async (request) => ledger.summary(request.params.id, true));
-  app.post<{ Params: { id: string }; Body: { id: string; amount: number } }>('/students/:id/grant', {
+  app.post<{ Params: { id: string }; Body: { id: string; amount: number; package?: PackageTerms } }>('/students/:id/grant', {
     onRequest: teacherOnly,
     schema: { params, body: {
       type: 'object', additionalProperties: false, required: ['id', 'amount'],
-      properties: { id: uuid, amount: { type: 'integer', minimum: 1, maximum: 100 } },
+      properties: {
+        id: uuid, amount: { type: 'integer', minimum: 1, maximum: 100 },
+        package: {
+          type: 'object', additionalProperties: false, required: ['validThrough', 'timeZone'],
+          properties: {
+            validThrough: { type: 'string', pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' },
+            timeZone: { type: 'string', minLength: 1, maxLength: 100 },
+          },
+        },
+      },
     } },
-  }, async (request) => ledger.grant(request.params.id, request.body.id, request.body.amount));
+  }, async (request) => ledger.grant(request.params.id, request.body.id, request.body.amount, request.body.package));
   app.post<{ Params: { id: string }; Body: { bookingId: string } }>('/students/:id/settle', {
     onRequest: teacherOnly,
     schema: { params, body: {
       type: 'object', additionalProperties: false, required: ['bookingId'], properties: { bookingId: uuid },
     } },
   }, async (request) => ledger.settle(request.params.id, request.body.bookingId));
+  app.post<{ Params: { id: string }; Body: { entryId: string } }>('/students/:id/reverse', {
+    onRequest: teacherOnly,
+    schema: { params, body: {
+      type: 'object', additionalProperties: false, required: ['entryId'],
+      properties: { entryId: uuid },
+    } },
+  }, async (request) => ledger.reverse(request.params.id, request.body.entryId));
 }

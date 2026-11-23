@@ -12,10 +12,20 @@ enum Role {
   STUDENT
 }
 
+enum ReminderState {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+  SKIPPED
+  UNKNOWN
+}
+
 enum CreditReason {
   GRANT
   COMPLETED_LESSON
   SAME_DAY_CANCELLATION
+  DEBIT_REVERSAL
 }
 
 model StudentInvitation {
@@ -33,6 +43,7 @@ model User {
   updatedAt  DateTime @updatedAt @db.Timestamptz(3)
   bookings   Booking[]
   creditEntries CreditEntry[]
+  lessonReminders LessonReminder[]
 }
 
 model AvailabilitySlot {
@@ -56,20 +67,45 @@ model Booking {
   slot      AvailabilitySlot @relation(fields: [slotId], references: [id], onDelete: Restrict)
   student   User             @relation(fields: [studentId], references: [id], onDelete: Restrict)
   creditEntry CreditEntry?
+  reminders LessonReminder[]
 
   @@index([studentId])
   @@index([slotId, studentId, createdAt])
+}
+
+model LessonReminder {
+  bookingId     String        @db.Uuid
+  recipientId   String        @db.Uuid
+  state         ReminderState @default(PENDING)
+  attempts      Int           @default(0)
+  nextAttemptAt DateTime      @db.Timestamptz(3)
+  updatedAt     DateTime      @db.Timestamptz(3)
+  booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  recipient     User          @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@id([bookingId, recipientId])
+  @@index([state, nextAttemptAt])
 }
 
 model CreditEntry {
   id        String       @id @default(uuid()) @db.Uuid
   studentId String       @db.Uuid
   bookingId String?      @unique @db.Uuid
+  reversesId String?     @unique @db.Uuid
+  packageId String?      @db.Uuid
+  validThrough String?   @db.VarChar(10)
+  packageTimeZone String? @db.VarChar(100)
+  expiresAt DateTime?    @db.Timestamptz(3)
   amount    Int
   reason    CreditReason
   createdAt DateTime     @default(now()) @db.Timestamptz(3)
   student   User         @relation(fields: [studentId], references: [id], onDelete: Restrict)
   booking   Booking?     @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  reverses  CreditEntry? @relation("DebitReversal", fields: [reversesId], references: [id], onDelete: Restrict)
+  reversal  CreditEntry? @relation("DebitReversal")
+  creditPackage CreditEntry? @relation("PackageEntries", fields: [packageId], references: [id], onDelete: Restrict)
+  packageEntries CreditEntry[] @relation("PackageEntries")
 
   @@index([studentId, createdAt])
+  @@index([studentId, packageId])
 }

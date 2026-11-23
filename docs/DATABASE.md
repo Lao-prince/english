@@ -27,7 +27,9 @@ erDiagram
 
 ## Planned constraints
 
-The lesson credit ledger stores immutable grants and debits. A unique booking reference prevents duplicate settlement. Writes lock the student's account row to protect the balance during concurrent debits. See [Lesson credit ledger](CREDITS.md).
+Lesson reminders use a composite booking and recipient key to prevent duplicate deliveries. Delivery state and retry timing are recorded separately from the booking. See [Lesson reminders](REMINDERS.md).
+
+The lesson credit ledger stores immutable grants, debits and debit reversals. Dated grants are packages, and debits and reversals keep a reference to their source package. Existing credits remain non-expiring. A unique booking reference prevents duplicate settlement, and a unique self-reference ensures a debit can be reversed once. Writes lock the student's account row to protect concurrent balance changes. See [Lesson credit ledger](CREDITS.md).
 
 Student accounts can store a nullable teacher-assigned display name. Existing accounts and newly invited students can remain unnamed. See [Student roster](STUDENTS.md).
 

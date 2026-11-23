@@ -4,6 +4,7 @@ import { authRoutes } from './auth.js';
 import { creditRoutes } from './credit-routes.js';
 import { creditLedger } from './credits.js';
 import { invitations } from './invitations.js';
+import { lessonReminders } from './lesson-reminders.js';
 import { scheduleRoutes } from './schedule.js';
 import { studentRoutes } from './student-routes.js';
 import { studentRoster } from './students.js';
@@ -34,7 +35,11 @@ app.register(authRoutes, {
   findByTelegramId: (telegramId) => prisma.user.findUnique({ where: { telegramId }, select }),
   findById: (id) => prisma.user.findUnique({ where: { id }, select }),
 });
-app.addHook('onClose', () => prisma.$disconnect());
+let stopReminders: (() => Promise<void>) | undefined;
+app.addHook('onClose', async () => {
+  await stopReminders?.();
+  await prisma.$disconnect();
+});
 app.register(scheduleRoutes, { prefix: '/api/schedule', prisma, secret });
 app.register(studentRoutes, {
   prefix: '/api/students',
@@ -49,6 +54,9 @@ app.register(creditRoutes, {
 
 try {
   await app.listen({ host: process.env.API_HOST ?? '127.0.0.1', port: 3000 });
+  if (process.env.NODE_ENV === 'production' && botToken) {
+    stopReminders = lessonReminders(prisma, botToken, () => app.log.warn('Lesson reminder cycle failed'));
+  }
 } catch (error) {
   app.log.error(error);
   process.exitCode = 1;

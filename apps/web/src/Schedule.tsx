@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Button, EmptyState, Field, Icon, IconButton, LoadingState, Notice, Panel } from './ui';
 import { apiMessage } from './apiMessage';
+import { LessonTime, ScheduleDays } from './ScheduleDays';
 
 type Slot = { id: string; startsAt: string; endsAt: string; timeZone: string };
 type Booking = Pick<Slot, 'id' | 'startsAt' | 'endsAt'> & {
@@ -123,10 +124,9 @@ export function Schedule({ teacher, token, view }: { teacher: boolean; token: st
             {teacher ? 'Добавьте время, чтобы ученики могли записаться.' : 'Здесь появится время, которое откроет преподаватель.'}
           </EmptyState>}
           {!!slots?.length && (
-            <ul className="item-list">
-              {slots.map((slot) => (
+            <ScheduleDays items={slots} renderRow={(slot) => (
                 <li key={slot.id} className="item-row">
-                  <p className="item-title"><time dateTime={slot.startsAt}>{display.formatRange(new Date(slot.startsAt), new Date(slot.endsAt))}</time></p>
+                  <p className="item-title"><LessonTime {...slot} /></p>
                   {teacher ? <Button variant="quiet" disabled={busy}
                     aria-label={`Закрыть запись на ${display.format(new Date(slot.startsAt))}`}
                     onClick={() => void mutate(`${endpoint}/${slot.id}/close`)}>Закрыть</Button>
@@ -148,8 +148,7 @@ export function Schedule({ teacher, token, view }: { teacher: boolean; token: st
                         setError('');
                       }}>Записаться <Icon name="arrow" /></Button>}
                 </li>
-              ))}
-            </ul>
+            )} />
           )}
         </section>
       </div>
@@ -159,11 +158,10 @@ export function Schedule({ teacher, token, view }: { teacher: boolean; token: st
           Здесь появятся предстоящие уроки.
         </EmptyState>}
         {!!bookings?.length && (
-          <ul className="item-list">
-            {bookings.map((booking) => (
+          <ScheduleDays items={bookings} heading="h2" renderRow={(booking) => (
               <li key={booking.id} className="item-row lesson-row">
                 <div>
-                  <p className="item-title"><time dateTime={booking.startsAt}>{display.formatRange(new Date(booking.startsAt), new Date(booking.endsAt))}</time></p>
+                  <p className="item-title"><LessonTime {...booking} /></p>
                   {booking.studentReference && <p className="muted">
                     {booking.studentDisplayName ?? `ID ученика: ${booking.studentReference}`}
                   </p>}
@@ -195,8 +193,7 @@ export function Schedule({ teacher, token, view }: { teacher: boolean; token: st
                   aria-label={`Отменить урок на ${display.format(new Date(booking.startsAt))}`}
                   onClick={() => { setCancelling(booking.id); setNotice(''); setError(''); }}>Отменить урок</Button>)}
               </li>
-            ))}
-          </ul>
+          )} />
         )}
       </section>
     </section>
