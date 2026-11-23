@@ -1,12 +1,21 @@
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Schedule } from './Schedule';
-import { StudentInvitations } from './StudentInvitations';
+import { Brand, Workspace } from './Workspace';
+import { Button, Field, LoadingState, Notice, Panel } from './ui';
 import './styles.css';
 
 declare global {
   interface Window {
-    Telegram?: { WebApp?: { initData: string; ready(): void } };
+    Telegram?: { WebApp?: {
+      initData: string;
+      ready(): void;
+      colorScheme?: 'light' | 'dark';
+      viewportStableHeight?: number;
+      safeAreaInset?: { bottom: number };
+      contentSafeAreaInset?: { bottom: number };
+      onEvent?(event: string, callback: () => void): void;
+      offEvent?(event: string, callback: () => void): void;
+    } };
   }
 }
 
@@ -86,6 +95,30 @@ function App() {
   const [submittedCode, setSubmittedCode] = useState('');
 
   useEffect(() => {
+    const telegram = window.Telegram?.WebApp;
+    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
+    const miniApp = telegram?.initData ? telegram : undefined;
+    const html = document.documentElement;
+    const update = () => {
+      html.dataset.theme = miniApp?.colorScheme ?? (systemTheme.matches ? 'dark' : 'light');
+      if (miniApp?.viewportStableHeight) html.style.setProperty('--app-height', `${miniApp.viewportStableHeight}px`);
+      const bottom = (miniApp?.safeAreaInset?.bottom ?? 0) + (miniApp?.contentSafeAreaInset?.bottom ?? 0);
+      html.style.setProperty('--telegram-bottom', `${bottom}px`);
+    };
+    const events = ['themeChanged', 'viewportChanged', 'safeAreaChanged', 'contentSafeAreaChanged'];
+    update();
+    systemTheme.addEventListener('change', update);
+    for (const event of events) miniApp?.onEvent?.(event, update);
+    return () => {
+      systemTheme.removeEventListener('change', update);
+      for (const event of events) miniApp?.offEvent?.(event, update);
+      delete html.dataset.theme;
+      html.style.removeProperty('--app-height');
+      html.style.removeProperty('--telegram-bottom');
+    };
+  }, []);
+
+  useEffect(() => {
     const controller = new AbortController();
     const telegram = window.Telegram?.WebApp;
     telegram?.ready();
@@ -99,48 +132,44 @@ function App() {
     return () => controller.abort();
   }, [attempt, submittedCode]);
 
-  const teacher = view.state === 'signed-in' && view.account.role === 'TEACHER';
+  if (view.state === 'signed-in') {
+    return <Workspace teacher={view.account.role === 'TEACHER'} token={readToken()} />;
+  }
 
   return (
-    <main className="mx-auto grid min-h-dvh max-w-xl content-center px-6 py-12">
-      <h1 className="text-4xl font-semibold tracking-tight">English Space</h1>
-      {view.state === 'signed-in' ? (
-        <>
-          <p className="mt-2">{teacher ? 'Teacher workspace' : 'Student workspace'}</p>
-          <Schedule teacher={teacher} token={readToken()} />
-          {teacher && <StudentInvitations token={readToken()} />}
-        </>
-      ) : (
-        <p role="status" className="mt-4 text-lg text-slate-600 dark:text-slate-300">{messages[view.state]}</p>
-      )}
-      {(view.state === 'pending' || view.state === 'invalid-invite') && (
-        <form className="mt-5 grid gap-3" onSubmit={(event) => {
-          event.preventDefault();
-          setView({ state: 'loading' });
-          setSubmittedCode(code.trim());
-          setAttempt((value) => value + 1);
-        }}>
-          <label className="grid gap-1">
-            Invitation code
-            <input className="min-w-0 rounded-lg border border-current p-2" required
-              autoCapitalize="none" spellCheck={false} pattern="invite_[A-Za-z0-9_\-]{24}"
-              value={code} onChange={(event) => setCode(event.target.value)} />
-          </label>
-          <button type="submit" className="w-fit rounded-lg border border-current px-4 py-2">Join as student</button>
-        </form>
-      )}
-      {view.state === 'error' && (
-        <button
-          type="button"
-          className="mt-5 w-fit rounded-lg bg-slate-900 px-4 py-2 font-medium text-white dark:bg-slate-100 dark:text-slate-900"
-          onClick={() => {
+    <main className="access">
+      <Brand />
+      <Panel className="access-panel">
+        <h1>{view.state === 'pending' || view.state === 'invalid-invite' ? 'Join English Space' : 'English Space'}</h1>
+        {view.state === 'loading' ? <LoadingState label={messages.loading} /> :
+          <Notice tone={view.state === 'error' || view.state === 'invalid-invite' ? 'danger' : 'info'}>{messages[view.state]}</Notice>}
+        {(view.state === 'pending' || view.state === 'invalid-invite') && (
+          <form className="form-stack" onSubmit={(event) => {
+            event.preventDefault();
             setView({ state: 'loading' });
-            setAttempt(attempt + 1);
-          }}
-        >
-          Try again
-        </button>
-      )}
+            setSubmittedCode(code.trim());
+            setAttempt((value) => value + 1);
+          }}>
+            <Field label="Invitation code">
+              <input required
+                autoCapitalize="none" spellCheck={false} pattern="invite_[A-Za-z0-9_\-]{24}"
+                value={code} onChange={(event) => setCode(event.target.value)} />
+            </Field>
+            <Button type="submit" variant="primary">Join as student</Button>
+          </form>
+        )}
+        {view.state === 'error' && (
+          <Button
+            variant="primary"
+            onClick={() => {
+              setView({ state: 'loading' });
+              setAttempt(attempt + 1);
+            }}
+          >
+            Try again
+          </Button>
+        )}
+      </Panel>
     </main>
   );
 }

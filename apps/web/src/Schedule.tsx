@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Button, EmptyState, Field, Icon, IconButton, LoadingState, Notice, Panel } from './ui';
 
 type Slot = { id: string; startsAt: string; endsAt: string; timeZone: string };
 type Booking = Pick<Slot, 'id' | 'startsAt' | 'endsAt'> & {
@@ -7,9 +8,8 @@ type Booking = Pick<Slot, 'id' | 'startsAt' | 'endsAt'> & {
 const endpoint = '/api/schedule/slots';
 const viewerZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const display = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-const button = 'rounded-lg border border-current px-3 py-2 font-medium disabled:opacity-50';
 
-export function Schedule({ teacher, token }: { teacher: boolean; token: string }) {
+export function Schedule({ teacher, token, view }: { teacher: boolean; token: string; view: 'schedule' | 'lessons' | 'students' }) {
   const [slots, setSlots] = useState<Slot[] | null>(null);
   const [bookings, setBookings] = useState<Booking[] | null>(null);
   const [selected, setSelected] = useState<{ slotId: string; requestId: string } | null>(null);
@@ -84,83 +84,94 @@ export function Schedule({ teacher, token }: { teacher: boolean; token: string }
   }
 
   return (
-    <section aria-labelledby="schedule-heading" className="mt-8 space-y-5 rounded-2xl border border-slate-200 p-5 dark:border-slate-800">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="schedule-heading" className="text-xl font-semibold">Available lesson times</h2>
-        <button type="button" className={button} onClick={() => {
+    <section className="schedule-stack" hidden={view === 'students'} aria-label="Lesson schedule">
+      <div className="section-tools">
+        <p className="muted">Times shown in <strong>{viewerZone}</strong></p>
+        <IconButton icon="refresh" label="Refresh schedule" variant="quiet" onClick={() => {
           setError('');
           setRevision((value) => value + 1);
-        }}>Refresh</button>
+        }} />
       </div>
-      <p className="text-sm">Times shown in {viewerZone}.</p>
-      {teacher && (
-        <form onSubmit={publish} className="grid gap-3">
-          <fieldset disabled={busy} className="grid min-w-0 gap-3">
-            <label className="grid gap-1">
-              Start date and time
-              <input className="min-w-0 rounded-lg border border-current p-2" type="datetime-local" required
-                value={start} onChange={(event) => setStart(event.target.value)} />
-            </label>
-            <label className="grid gap-1">
-              Duration in minutes
-              <input className="rounded-lg border border-current p-2" type="number" required min={1} max={1440}
-                value={duration} onChange={(event) => setDuration(event.target.value)} />
-            </label>
-            <button className={button} type="submit">Publish slot</button>
-          </fieldset>
-        </form>
-      )}
-      {error && <p role="alert">{error}</p>}
-      {notice && <p role="status">{notice}</p>}
-      {slots === null && !error && <p role="status">Loading the schedule…</p>}
-      {slots?.length === 0 && <p>No upcoming times are open.</p>}
-      {!!slots?.length && (
-        <ul className="divide-y divide-slate-200 dark:divide-slate-800">
-          {slots.map((slot) => (
-            <li key={slot.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
-              <span>{display.formatRange(new Date(slot.startsAt), new Date(slot.endsAt))}</span>
-              {teacher ? <button className={button} type="button" disabled={busy}
-                aria-label={`Close slot at ${display.format(new Date(slot.startsAt))}`}
-                onClick={() => void mutate(`${endpoint}/${slot.id}/close`)}>Close</button>
-                : selected?.slotId === slot.id ? (
-                  <div className="flex flex-wrap gap-2">
-                    <button className={button} type="button" disabled={busy} onClick={async () => {
-                      if (await mutate(`${endpoint}/${slot.id}/book?requestId=${selected.requestId}`)) {
-                        setSelected(null);
-                        setNotice('Lesson booked.');
-                      }
-                    }}>Confirm booking</button>
-                    <button className={button} type="button" disabled={busy} onClick={() => setSelected(null)}>Back</button>
-                  </div>
-                ) : <button className={button} type="button" disabled={busy}
-                  aria-label={`Book lesson at ${display.format(new Date(slot.startsAt))}`}
-                  onClick={() => {
-                    setSelected({ slotId: slot.id, requestId: crypto.randomUUID() });
-                    setNotice('');
-                    setError('');
-                  }}>Book</button>}
-            </li>
-          ))}
-        </ul>
-      )}
-      <section aria-labelledby="upcoming-heading" className="space-y-2 border-t border-slate-200 pt-4 dark:border-slate-800">
-        <h3 id="upcoming-heading" className="text-lg font-semibold">Upcoming lessons</h3>
-        {bookings?.length === 0 && <p>No lessons are booked yet.</p>}
+      {error && <Notice tone="danger">{error}</Notice>}
+      {notice && <Notice tone="success">{notice}</Notice>}
+      <div className={teacher ? 'schedule-grid' : 'schedule-stack'} hidden={view !== 'schedule'}>
+        {teacher && (
+          <Panel className="slot-form">
+            <h2>Publish a slot</h2>
+            <form onSubmit={publish}>
+              <fieldset disabled={busy} className="form-stack">
+                <Field label="Start date and time">
+                  <input type="datetime-local" required
+                    value={start} onChange={(event) => setStart(event.target.value)} />
+                </Field>
+                <Field label="Duration in minutes">
+                  <input type="number" required min={1} max={1440}
+                    value={duration} onChange={(event) => setDuration(event.target.value)} />
+                </Field>
+                <Button variant="primary" type="submit"><Icon name="plus" />Publish slot</Button>
+              </fieldset>
+            </form>
+          </Panel>
+        )}
+        <section aria-labelledby="availability-heading" className="list-section">
+          <h2 id="availability-heading">Available lesson times</h2>
+          {slots === null && !error && <LoadingState label="Loading the schedule…" />}
+          {slots?.length === 0 && <EmptyState icon="schedule" title="No upcoming times are open">
+            {teacher ? 'Publish a slot to open it for student booking.' : 'Check back when your teacher publishes a time.'}
+          </EmptyState>}
+          {!!slots?.length && (
+            <ul className="item-list">
+              {slots.map((slot) => (
+                <li key={slot.id} className="item-row">
+                  <p className="item-title"><time dateTime={slot.startsAt}>{display.formatRange(new Date(slot.startsAt), new Date(slot.endsAt))}</time></p>
+                  {teacher ? <Button variant="quiet" disabled={busy}
+                    aria-label={`Close slot at ${display.format(new Date(slot.startsAt))}`}
+                    onClick={() => void mutate(`${endpoint}/${slot.id}/close`)}>Close</Button>
+                    : selected?.slotId === slot.id ? (
+                      <div className="actions">
+                        <Button variant="primary" disabled={busy} onClick={async () => {
+                          if (await mutate(`${endpoint}/${slot.id}/book?requestId=${selected.requestId}`)) {
+                            setSelected(null);
+                            setNotice('Lesson booked.');
+                          }
+                        }}>Confirm booking</Button>
+                        <Button variant="quiet" disabled={busy} onClick={() => setSelected(null)}>Back</Button>
+                      </div>
+                    ) : <Button variant="primary" disabled={busy}
+                      aria-label={`Book lesson at ${display.format(new Date(slot.startsAt))}`}
+                      onClick={() => {
+                        setSelected({ slotId: slot.id, requestId: crypto.randomUUID() });
+                        setNotice('');
+                        setError('');
+                      }}>Book <Icon name="arrow" /></Button>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+      <section aria-label="Upcoming reservations" hidden={view !== 'lessons'}>
+        {bookings === null && !error && <LoadingState label="Loading upcoming lessons…" />}
+        {bookings?.length === 0 && <EmptyState icon="lessons" title="No lessons are booked yet">
+          Booked lessons will appear here.
+        </EmptyState>}
         {!!bookings?.length && (
-          <ul className="divide-y divide-slate-200 dark:divide-slate-800">
+          <ul className="item-list">
             {bookings.map((booking) => (
-              <li key={booking.id} className="py-3">
-                <p>{display.formatRange(new Date(booking.startsAt), new Date(booking.endsAt))}</p>
-                {booking.studentReference && <p className="break-all text-sm">Student ID {booking.studentReference}</p>}
+              <li key={booking.id} className="item-row lesson-row">
+                <div>
+                  <p className="item-title"><time dateTime={booking.startsAt}>{display.formatRange(new Date(booking.startsAt), new Date(booking.endsAt))}</time></p>
+                  {booking.studentReference && <p className="muted">Student ID {booking.studentReference}</p>}
+                </div>
                 {!teacher && (cancelling === booking.id ? (
-                  <div className="mt-2 space-y-2">
-                    <p>
+                  <div className="confirmation">
+                    <Notice tone={booking.cancellationChargeApplies ? 'warning' : 'info'}>
                       {booking.cancellationChargeApplies
                         ? 'This is the lesson day in the teacher’s time zone. Cancelling will count as a paid lesson.'
                         : 'You can cancel without a charge before the lesson day in the teacher’s time zone.'}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <button type="button" className={button} disabled={busy} onClick={async () => {
+                    </Notice>
+                    <div className="actions">
+                      <Button variant="danger" disabled={busy} onClick={async () => {
                         const response = await mutate(`/api/schedule/bookings/${booking.id}/cancel`, {
                           acceptSameDayCharge: booking.cancellationChargeApplies === true,
                         });
@@ -171,14 +182,13 @@ export function Schedule({ teacher, token }: { teacher: boolean; token: string }
                             ? 'Lesson cancelled. Recorded as chargeable.'
                             : 'Lesson cancelled without a charge.');
                         }
-                      }}>{booking.cancellationChargeApplies ? 'Cancel and accept charge' : 'Confirm cancellation'}</button>
-                      <button type="button" className={button} disabled={busy}
-                        onClick={() => setCancelling(null)}>Keep lesson</button>
+                      }}>{booking.cancellationChargeApplies ? 'Cancel and accept charge' : 'Confirm cancellation'}</Button>
+                      <Button variant="quiet" disabled={busy} onClick={() => setCancelling(null)}>Keep lesson</Button>
                     </div>
                   </div>
-                ) : <button type="button" className={`mt-2 ${button}`} disabled={busy}
+                ) : <Button variant="quiet" disabled={busy}
                   aria-label={`Cancel lesson at ${display.format(new Date(booking.startsAt))}`}
-                  onClick={() => { setCancelling(booking.id); setNotice(''); setError(''); }}>Cancel lesson</button>)}
+                  onClick={() => { setCancelling(booking.id); setNotice(''); setError(''); }}>Cancel lesson</Button>)}
               </li>
             ))}
           </ul>
