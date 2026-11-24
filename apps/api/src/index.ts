@@ -34,6 +34,12 @@ app.register(authRoutes, {
   botUsername: process.env.TELEGRAM_BOT_USERNAME?.trim(),
   findByTelegramId: (telegramId) => prisma.user.findUnique({ where: { telegramId }, select }),
   findById: (id) => prisma.user.findUnique({ where: { id }, select }),
+  syncStudentProfile: (id, { id: telegramId, ...profile }) => prisma.user.updateMany({
+    where: { id, telegramId, role: 'STUDENT', OR: [
+      { telegramProfileAt: null }, { telegramProfileAt: { lt: profile.telegramProfileAt } },
+    ] },
+    data: profile,
+  }),
 });
 let stopReminders: (() => Promise<void>) | undefined;
 app.addHook('onClose', async () => {

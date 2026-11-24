@@ -95,10 +95,8 @@ h2 { color: var(--section-title); font-size: var(--text-section); font-weight: 6
 .brand-mark, .icon-tile { display: inline-grid; place-items: center; inline-size: 2.25rem; block-size: 2.25rem; flex: none; border-radius: var(--radius-control); background: var(--surface-secondary); color: var(--accent); }
 .brand-mark { background: var(--brand-pink); color: var(--on-brand); font-size: 1.25rem; font-weight: 650; }
 .badge { color: var(--subtitle); font-size: var(--text-small); font-weight: 550; }
-.app-header { border-block-end: var(--border-width) solid var(--border); background: var(--header); padding-block-start: var(--safe-top); }
-.header-inner, .content { inline-size: min(100%, var(--content-width)); margin-inline: auto; padding-inline: var(--gutter); }
-.header-inner { min-block-size: 4rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2) var(--space-3); padding-block: var(--space-2); }
-.content { padding-block: var(--space-8) calc(var(--dock-height) + var(--safe-bottom) + var(--space-8)); }
+.content { inline-size: min(100%, var(--content-width)); margin-inline: auto; padding-inline: var(--gutter); }
+.content { padding-block: calc(var(--space-8) + var(--safe-top)) calc(var(--dock-height) + var(--safe-bottom) + var(--space-8)); }
 .page-heading { margin-block-end: var(--space-6); }
 .page-heading h1:focus { outline: none; }
 .app-nav { position: fixed; z-index: 5; inset-inline: 0; inset-block-end: 0; display: flex; min-block-size: calc(var(--dock-height) + var(--safe-bottom)); padding: var(--space-1) var(--gutter) var(--safe-bottom); background: var(--header); border-block-start: var(--border-width) solid var(--border); }
@@ -149,6 +147,9 @@ h2 { color: var(--section-title); font-size: var(--text-section); font-weight: 6
 .lesson-cards { display: grid; gap: var(--space-2); padding: 0; margin: 0; list-style: none; }
 .lesson-card { background: var(--surface); border: 0; padding: var(--space-3); border-radius: var(--radius-panel); }
 .lesson-card-main { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.student-avatar { display: grid; place-items: center; flex: none; width: 2.5rem; height: 2.5rem; border-radius: 50%; overflow: hidden; background: var(--brand-pink); color: var(--on-brand); font-size: var(--text-small); font-weight: 650; }
+.student-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.student-telegram { color: var(--link); text-decoration: underline; font-size: var(--text-small); }
 .lesson-card--booked .icon-tile { background: var(--brand-pink); color: var(--on-brand); }
 .item-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); padding-block: var(--space-4); border-block-end: var(--border-width) solid var(--border); overflow-wrap: anywhere; }
 .confirmation { display: grid; gap: var(--space-2); flex-basis: 100%; }
@@ -184,6 +185,7 @@ h2 { color: var(--section-title); font-size: var(--text-section); font-weight: 6
   .workspace:has(.field:focus-within) .app-nav { visibility: hidden; }
 }
 @media (min-width: 48rem) {
+  .app-header { background: var(--header); padding: calc(var(--space-2) + var(--safe-top)) var(--gutter) var(--space-2); border-block-end: var(--border-width) solid var(--border); }
   .app-nav { position: static; flex: 0 1 auto; border: 0; min-block-size: 0; padding: 0; gap: var(--space-2); }
   .app-nav a { flex: none; flex-direction: row; gap: var(--space-2); padding-inline: var(--space-3); }
   .content { padding-block: var(--space-12); }
@@ -192,9 +194,7 @@ h2 { color: var(--section-title); font-size: var(--text-section); font-weight: 6
 
 @media (min-width: 64rem) {
   .workspace { display: grid; grid-template-columns: 14rem minmax(0, 1fr); }
-  .app-header { position: sticky; top: 0; align-self: start; min-block-size: var(--app-height, 100dvh); border-block-end: 0; border-inline-end: var(--border-width) solid var(--border); }
-  .header-inner { display: grid; justify-content: stretch; align-content: start; padding: var(--space-8) var(--space-4); gap: var(--space-5); }
-  .header-inner .badge { grid-row: 2; padding-inline: var(--space-2); }
+  .app-header { position: sticky; top: 0; align-self: start; min-block-size: var(--app-height, 100dvh); padding: calc(var(--space-8) + var(--safe-top)) var(--space-4); border-block-end: 0; border-inline-end: var(--border-width) solid var(--border); }
   .app-nav { display: grid; }
   .app-nav a { justify-content: start; padding-inline: var(--space-2); }
   .app-nav a[aria-current] { background: var(--brand-pink); color: var(--on-brand); }

@@ -1,6 +1,9 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 
-const rosterFields = { id: true, displayName: true, telegramId: true, createdAt: true } as const;
+const rosterFields = {
+  id: true, displayName: true, telegramId: true, telegramName: true, telegramUsername: true,
+  telegramAvatarUrl: true, createdAt: true,
+} as const;
 
 function rosterEntry(student: Prisma.UserGetPayload<{ select: typeof rosterFields }>) {
   return { ...student, telegramId: student.telegramId?.toString() ?? null };

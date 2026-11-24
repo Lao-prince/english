@@ -91,6 +91,8 @@ export function availability(prisma: PrismaClient) {
     },
     book(slotId: string, studentId: string, requestId?: string) {
       return writeCalendar(async (tx) => {
+        const student = await tx.user.findFirst({ where: { id: studentId, role: 'STUDENT' }, select: { id: true } });
+        if (!student) throw new ScheduleError(404, 'Student account not found.');
         const slot = await tx.availabilitySlot.findUnique({ where: { id: slotId }, include: { bookings: activeBookings } });
         if (!slot) throw new ScheduleError(404, 'This slot does not exist.');
         const times = { slotId, startsAt: slot.startsAt, endsAt: slot.endsAt };
@@ -233,14 +235,21 @@ export function availability(prisma: PrismaClient) {
         select: {
           id: true, slotId: true, slot: { select: { startsAt: true, endsAt: true, timeZone: true } },
           moves: moveHistory,
-          student: teacher ? { select: { id: true, telegramId: true, displayName: true } } : false,
+          student: teacher ? { select: {
+            id: true, telegramId: true, displayName: true, telegramName: true, telegramUsername: true, telegramAvatarUrl: true,
+          } } : false,
         },
       });
       return bookings.map(({ id, slotId, slot, student, moves }) => ({
         id, slotId, startsAt: slot.startsAt, endsAt: slot.endsAt,
         ...(moves.length && { moves }),
         ...(student
-          ? { studentReference: student.telegramId?.toString() ?? student.id, studentDisplayName: student.displayName }
+          ? {
+            studentReference: student.telegramId?.toString() ?? student.id,
+            studentDisplayName: student.displayName ?? student.telegramName ??
+              (student.telegramUsername ? `@${student.telegramUsername}` : null),
+            studentAvatarUrl: student.telegramAvatarUrl,
+          }
           : { cancellationChargeApplies: sameLessonDay(now, slot.startsAt, slot.timeZone) }),
       }));
     },

@@ -27,6 +27,8 @@ erDiagram
 
 ## Planned constraints
 
+Student accounts retain the last verified Telegram name, username, avatar URL, and launch timestamp separately from the teacher's display name. See [Telegram profile](STUDENTS.md#telegram-profile).
+
 Booking moves retain the booking ID and store a snapshot of the original and new times, the teacher, and the operation ID. Moving a booking uses the same active-slot uniqueness constraint as booking. See [Student booking](BOOKING.md).
 
 Teacher cancellations keep the optional student-facing reason and the reopening decision. A database check prevents teacher cancellations from being chargeable. See [Student booking](BOOKING.md).

@@ -53,6 +53,13 @@ export async function scheduleRoutes(
       type: 'object', additionalProperties: false, properties: { requestId: uuid },
     } },
   }, async (request) => schedule.book(request.params.id, accountFor(request).id, request.query.requestId));
+  app.post<{ Params: { id: string }; Body: { studentId: string; requestId: string } }>('/slots/:id/teacher-book', {
+    onRequest: requireRole('TEACHER'),
+    schema: { params: slotParams, body: {
+      type: 'object', additionalProperties: false, required: ['studentId', 'requestId'],
+      properties: { studentId: uuid, requestId: uuid },
+    } },
+  }, async (request) => schedule.book(request.params.id, request.body.studentId, request.body.requestId));
   app.post<{ Params: { id: string }; Body: { acceptSameDayCharge: boolean } }>('/bookings/:id/cancel', {
     onRequest: requireRole('STUDENT'),
     schema: {

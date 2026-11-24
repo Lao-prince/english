@@ -37,6 +37,46 @@ test('schedule mutations enforce roles before handling a booking', async (t) => 
   assert.equal((await request('/bookings/invalid/teacher-cancel', studentId)).statusCode, 403);
   assert.equal((await request('/bookings/invalid/reschedule', studentId)).statusCode, 403);
   assert.equal((await request('/bookings/invalid/reschedule', teacherId)).statusCode, 400);
+  assert.equal((await request('/slots/invalid/teacher-book', studentId)).statusCode, 403);
+});
+
+test('teacher assignment uses the chosen student and returns the shared booking response', async (t) => {
+  const app = Fastify();
+  t.after(() => app.close());
+  const teacherId = randomUUID();
+  const studentId = randomUUID();
+  const slotId = randomUUID();
+  const requestId = randomUUID();
+  const secret = 'synthetic-teacher-booking-key';
+  const startsAt = new Date(Date.now() + 86_400_000);
+  const endsAt = new Date(startsAt.getTime() + 3_600_000);
+  const tx = {
+    $executeRaw: async () => 0,
+    user: { findFirst: async ({ where }: { where: { id: string; role: string } }) =>
+      where.id === studentId && where.role === 'STUDENT' ? { id: studentId } : null },
+    availabilitySlot: { findUnique: async () => ({ startsAt, endsAt, bookings: [], closedAt: null }) },
+    booking: {
+      findUnique: async () => null,
+      create: async ({ data }: { data: unknown }) => {
+        assert.deepEqual(data, { id: requestId, slotId, studentId });
+        return { id: requestId };
+      },
+    },
+  };
+  const prisma = {
+    user: { findUnique: async () => ({ id: teacherId, role: 'TEACHER' }) },
+    $transaction: async (callback: (value: typeof tx) => unknown) => callback(tx),
+  } as unknown as PrismaClient;
+  app.register(scheduleRoutes, { prisma, secret });
+  const book = (target: string) => app.inject({
+    method: 'POST', url: `/slots/${slotId}/teacher-book`,
+    headers: { authorization: `Bearer ${issueSession(teacherId, secret, Math.floor(Date.now() / 1000))}` },
+    payload: { studentId: target, requestId },
+  });
+  assert.equal((await book(teacherId)).statusCode, 404);
+  const result = await book(studentId);
+  assert.equal(result.statusCode, 200);
+  assert.deepEqual(result.json(), { id: requestId, slotId, startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() });
 });
 
 test('lesson history queries only the student from the verified session', async (t) => {

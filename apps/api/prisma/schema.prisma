@@ -39,6 +39,10 @@ model User {
   telegramId BigInt?  @unique
   role       Role
   displayName String?  @db.VarChar(80)
+  telegramName String? @db.VarChar(120)
+  telegramUsername String? @db.VarChar(32)
+  telegramAvatarUrl String?
+  telegramProfileAt DateTime? @db.Timestamptz(3)
   createdAt  DateTime @default(now()) @db.Timestamptz(3)
   updatedAt  DateTime @updatedAt @db.Timestamptz(3)
   bookings   Booking[]

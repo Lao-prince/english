@@ -4,7 +4,7 @@ English Space uses a React and Vite client with role-filtered query navigation. 
 
 | Area | Existing | Needed |
 | --- | --- | --- |
-| Identity | Telegram sessions, one teacher, student invitations and display names | Signed Telegram profile metadata, teacher-facing student profile and preferences |
+| Identity | Telegram sessions, one teacher, invitations, display names and signed student profile metadata | Expanded teacher-facing student profile and preferences |
 | Calendar | One-hour slots, date picker, atomic self-booking and student cancellation | Slot visibility and editing, personal offers, teacher booking, teacher cancellation and reschedule history |
 | Lessons | Upcoming lists and settled lesson debits | Student home and history, explicit completion independent of credit, no-show policy if wanted |
 | Subscription | Credit ledger, dated grants, expiry, reversal and settlement | Named package lifecycle, queued renewals, booking coverage, payment records and a teacher-wide view |
@@ -15,7 +15,7 @@ English Space uses a React and Vite client with role-filtered query navigation. 
 1. Ship the student home, read-only history, and subscription navigation using the existing records. No migration.
 2. Booking completion is stored explicitly and backfilled from completed-lesson debits. Unsettled historical lessons remain unconfirmed. Teacher cancellation records the actor role, optional shared reason and reopening decision. Teacher rescheduling records a history of both time intervals while keeping the original booking ID.
 3. Add explicit package and manual payment records while retaining the credit ledger. Migrate current dated grants without assuming prices or payments. Define booking coverage and pending reservations before adding the per-student override or enforcing limits.
-4. Add personal offers with a unique active reservation per slot, then teacher booking. Use the existing calendar transaction and active-booking uniqueness. Add role-scoped screens and tests for accept, decline, expiry, revoke and competing bookings.
+4. Teacher booking uses the existing calendar transaction and active-booking uniqueness. Add personal offers with one active reservation per slot and role-scoped accept, decline, expiry and revoke flows.
 5. Persist notification intents with the relevant mutations and deliver through the existing bot. Preserve the paused reminder policy until it is agreed separately.
 
 ## Decisions before changing policy

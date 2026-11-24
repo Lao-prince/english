@@ -11,7 +11,10 @@ test('the teacher can list and rename students while other accounts are denied',
   const teacherId = randomUUID();
   const studentId = randomUUID();
   const secret = 'synthetic-roster-secret';
-  let student = { id: studentId, displayName: null as string | null, telegramId: '123', createdAt: new Date() };
+  let student = {
+    id: studentId, displayName: null as string | null, telegramId: '123', createdAt: new Date(),
+    telegramName: 'Synthetic Student', telegramUsername: 'FixtureStudent', telegramAvatarUrl: null,
+  };
   await app.register(studentRoutes, {
     prefix: '/api/students',
     secret,

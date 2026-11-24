@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Badge, Button, EmptyState, Field, Icon, IconButton, LoadingState, Notice, Panel } from './ui';
 import { LessonHistory } from './LessonHistory';
 import { LessonMoves, type LessonMove } from './LessonMoves';
+import { StudentAvatar } from './StudentAvatar';
 import { apiMessage } from './apiMessage';
 import { LessonTime } from './LessonTime';
 import { LessonCalendar, localDateKey } from './LessonCalendar';
@@ -10,6 +11,7 @@ type Slot = { id: string; startsAt: string; endsAt: string; timeZone: string };
 type Booking = Pick<Slot, 'id' | 'startsAt' | 'endsAt'> & {
   slotId: string; studentReference?: string; studentDisplayName?: string | null; cancellationChargeApplies?: boolean;
   moves?: LessonMove[];
+  studentAvatarUrl?: string | null;
 };
 const endpoint = '/api/schedule/slots';
 const viewerZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -240,7 +242,8 @@ export function Schedule({ teacher, token, view }: {
           <ul className="lesson-cards">{visibleBookings.map((booking) => (
               <li key={booking.id} className="item-row lesson-row lesson-card lesson-card--booked">
                 <div className="lesson-card-main">
-                  <span className="icon-tile"><Icon name="lessons" /></span>
+                  {teacher ? <StudentAvatar name={booking.studentDisplayName} url={booking.studentAvatarUrl} /> :
+                    <span className="icon-tile"><Icon name="lessons" /></span>}
                   <div>
                     <p className="item-title">{booking.studentDisplayName ?? 'Урок английского'}</p>
                     {showAll && <p className="muted">{fullDay.format(new Date(booking.startsAt))}</p>}

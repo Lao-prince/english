@@ -1,8 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Button, EmptyState, Field, IconButton, LoadingState, Notice } from './ui';
 import { CreditLedger } from './CreditLedger';
+import { TeacherBooking } from './TeacherBooking';
+import { StudentAvatar } from './StudentAvatar';
 
-type Student = { id: string; displayName: string | null; telegramId: string | null; createdAt: string };
+type Student = {
+  id: string; displayName: string | null; telegramId: string | null; createdAt: string;
+  telegramName?: string | null; telegramUsername?: string | null; telegramAvatarUrl?: string | null;
+};
 const endpoint = '/api/students';
 const dateFormat = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium' });
 
@@ -12,6 +17,7 @@ export function StudentRoster({ active, token }: { active: boolean; token: strin
   const [revision, setRevision] = useState(0);
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
   const [creditsFor, setCreditsFor] = useState<string | null>(null);
+  const [bookingFor, setBookingFor] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: 'danger' | 'success'; text: string } | null>(null);
 
@@ -57,8 +63,9 @@ export function StudentRoster({ active, token }: { active: boolean; token: strin
   }
 
   const needle = query.trim().toLocaleLowerCase();
-  const visible = students?.filter((student) => student.id === editing?.id ||
-    (student.displayName ?? '').toLocaleLowerCase().includes(needle) || (student.telegramId ?? '').includes(needle));
+  const visible = students?.filter((student) => student.id === editing?.id || student.id === bookingFor ||
+    [student.displayName, student.telegramName, student.telegramUsername && `@${student.telegramUsername}`, student.telegramId]
+      .some((value) => value?.toLocaleLowerCase().includes(needle)) || !needle);
 
   return (
     <section className="list-section" aria-labelledby="roster-heading">
@@ -71,7 +78,7 @@ export function StudentRoster({ active, token }: { active: boolean; token: strin
           }} />
       </div>
       {!!students?.length && <Field label="Поиск учеников">
-        <input type="search" placeholder="Имя или ID в Telegram" value={query} onChange={(event) => setQuery(event.target.value)} />
+        <input type="search" placeholder="Имя, @username или ID" value={query} onChange={(event) => setQuery(event.target.value)} />
       </Field>}
       {feedback && <Notice tone={feedback.tone}>{feedback.text}</Notice>}
       {students === null && !feedback && <LoadingState label="Загружаем список…" />}
@@ -83,34 +90,48 @@ export function StudentRoster({ active, token }: { active: boolean; token: strin
       </EmptyState>}
       {!!visible?.length && (
         <ul className="item-list">
-          {visible.map((student) => (
-            <li key={student.id} className="item-row">
-              <div>
-                <p className="item-title">{student.displayName ?? 'Ученик без имени'}</p>
-                {student.telegramId && <p className="muted">ID в Telegram: {student.telegramId}</p>}
-                <p className="muted">Аккаунт создан <time dateTime={student.createdAt}>{dateFormat.format(new Date(student.createdAt))}</time></p>
-              </div>
-              {editing?.id === student.id ? (
-                <form className="confirmation" onSubmit={save}>
-                  <Field label="Имя ученика">
-                    <input maxLength={80} disabled={saving} value={editing.name}
-                      onChange={(event) => setEditing({ id: student.id, name: event.target.value })} />
-                  </Field>
-                  <div className="actions">
-                    <Button type="submit" variant="primary" disabled={saving}>{saving ? 'Сохраняем…' : 'Сохранить имя'}</Button>
-                    <Button variant="quiet" disabled={saving} onClick={() => setEditing(null)}>Отмена</Button>
+          {visible.map((student) => {
+            const username = student.telegramUsername ? `@${student.telegramUsername}` : null;
+            const name = student.displayName ?? student.telegramName ?? username;
+            return (
+              <li key={student.id} className="item-row">
+                <div className="lesson-card-main">
+                  <StudentAvatar name={name} url={student.telegramAvatarUrl} />
+                  <div>
+                    <p className="item-title">{name ?? 'Ученик без имени'}</p>
+                    {username && <a className="student-telegram" href={`https://t.me/${student.telegramUsername}`}
+                      target="_blank" rel="noreferrer">{username}</a>}
+                    {student.telegramId && !username && <p className="muted">ID в Telegram: {student.telegramId}</p>}
+                    <p className="muted">Аккаунт создан <time dateTime={student.createdAt}>{dateFormat.format(new Date(student.createdAt))}</time></p>
                   </div>
-                </form>
-              ) : <div className="actions"><Button disabled={saving} onClick={() => {
-                setFeedback(null);
-                setEditing({ id: student.id, name: student.displayName ?? '' });
-              }}>Изменить имя</Button>
-                <Button aria-expanded={creditsFor === student.id}
-                  onClick={() => setCreditsFor(creditsFor === student.id ? null : student.id)}>Баланс</Button>
-              </div>}
-              {creditsFor === student.id && <div className="confirmation"><CreditLedger token={token} studentId={student.id} /></div>}
-            </li>
-          ))}
+                </div>
+                {editing?.id === student.id ? (
+                  <form className="confirmation" onSubmit={save}>
+                    <Field label="Имя ученика">
+                      <input maxLength={80} disabled={saving} value={editing.name}
+                        onChange={(event) => setEditing({ id: student.id, name: event.target.value })} />
+                    </Field>
+                    <div className="actions">
+                      <Button type="submit" variant="primary" disabled={saving}>{saving ? 'Сохраняем…' : 'Сохранить имя'}</Button>
+                      <Button variant="quiet" disabled={saving} onClick={() => setEditing(null)}>Отмена</Button>
+                    </div>
+                  </form>
+                ) : <div className="actions"><Button disabled={saving} onClick={() => {
+                  setFeedback(null);
+                  setEditing({ id: student.id, name: student.displayName ?? '' });
+                }}>Изменить имя</Button>
+                  <Button aria-expanded={creditsFor === student.id}
+                    onClick={() => setCreditsFor(creditsFor === student.id ? null : student.id)}>Баланс</Button>
+                  <Button aria-expanded={bookingFor === student.id} onClick={() => {
+                    setBookingFor(student.id);
+                    setCreditsFor(null);
+                  }}>Записать на урок</Button>
+                </div>}
+                {bookingFor === student.id && <TeacherBooking token={token} studentId={student.id} close={() => setBookingFor(null)} />}
+                {creditsFor === student.id && <div className="confirmation"><CreditLedger token={token} studentId={student.id} /></div>}
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

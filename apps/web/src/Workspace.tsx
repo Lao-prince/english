@@ -3,7 +3,7 @@ import { Schedule } from './Schedule';
 import { StudentInvitations } from './StudentInvitations';
 import { StudentRoster } from './StudentRoster';
 import { CreditLedger } from './CreditLedger';
-import { Badge, fieldValidation, Icon } from './ui';
+import { fieldValidation, Icon } from './ui';
 
 const teacherViews = [
   { id: 'lessons', label: 'Расписание', title: 'Расписание', icon: 'schedule' },
@@ -56,25 +56,21 @@ export function Workspace({ teacher, token }: { teacher: boolean; token: string 
   return (
     <div className="workspace">
       <header className="app-header">
-        <div className="header-inner">
-          <Brand />
-          <nav className="app-nav" aria-label="Разделы приложения">
-            {allowed.map(({ id, label, icon }) => (
-              <a href={viewUrl(id).href} key={id} aria-current={current.id === id ? 'page' : undefined}
-                onClick={(event) => {
-                  if (event.button || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
-                  event.preventDefault();
-                  if (id === current.id) return;
-                  window.history.pushState(null, '', viewUrl(id));
-                  moveFocus.current = true;
-                  setRequested(id);
-                }}>
-                <span className="nav-icon"><Icon name={icon} /></span><span>{label}</span>
-              </a>
-            ))}
-          </nav>
-          <Badge>{teacher ? 'Преподаватель' : 'Ученик'}</Badge>
-        </div>
+        <nav className="app-nav" aria-label="Разделы приложения">
+          {allowed.map(({ id, label, icon }) => (
+            <a href={viewUrl(id).href} key={id} aria-current={current.id === id ? 'page' : undefined}
+              onClick={(event) => {
+                if (event.button || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+                event.preventDefault();
+                if (id === current.id) return;
+                window.history.pushState(null, '', viewUrl(id));
+                moveFocus.current = true;
+                setRequested(id);
+              }}>
+              <span className="nav-icon"><Icon name={icon} /></span><span>{label}</span>
+            </a>
+          ))}
+        </nav>
       </header>
       <main className="content" id="main-content" {...fieldValidation}>
         <div className="page-heading">

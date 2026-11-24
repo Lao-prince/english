@@ -26,4 +26,10 @@ Before an active lesson starts, the teacher can move it to a different, open fut
 
 `POST /api/schedule/bookings/:id/reschedule` requires a teacher session and accepts `{ requestId, slotId, reopenPreviousSlot }`. It returns the immutable move record. Identical retries return that record even after another move. Reusing a request ID with different details returns 409. Missing records return 404. Started or terminal bookings, an unchanged destination, and a closed, past or occupied destination return 409. The existing booking routes include move history in upcoming lessons and student history. Original booking retries retain their existing booking and return its current slot.
 
+## Booking for a student
+
+The teacher selects a student from the roster, picks a free future slot, and confirms. The app creates the same confirmed booking as self-service and occupies the slot atomically. The student sees it in Lessons. No debit occurs at booking time, and the current booking policy does not require a credit balance. Adding eligibility rules and booking notifications is a later step.
+
+`POST /api/schedule/slots/:id/teacher-book` accepts `{ studentId, requestId }` and returns the existing booking response. It requires a teacher session. An invalid payload returns 400, a missing or non-student account or missing slot returns 404, and an unavailable slot or mismatched request retry returns 409. Matching retries return the same reservation. This uses the existing booking state and schema.
+
 Run `npm test` for route authorization checks. Set `TEST_DATABASE_URL` to an isolated, migrated PostgreSQL database to run the concurrency, ownership and retry checks.

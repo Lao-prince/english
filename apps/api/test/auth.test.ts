@@ -4,17 +4,17 @@ import { test } from 'node:test';
 import Fastify from 'fastify';
 import { authRoutes } from '../src/auth.js';
 import { issueSession, readSession, sessionLifetime } from '../src/session.js';
-import { verifyTelegramId } from '../src/telegram.js';
+import { verifyTelegramProfile } from '../src/telegram.js';
 
 const botToken = 'synthetic-test-key';
 const secret = 'synthetic-session-key';
 const student = { id: '00000000-0000-4000-8000-000000000001', role: 'STUDENT' } as const;
 
-function launch(telegramId: number, date: number, startParam?: string) {
+function launch(telegramId: number, date: number, startParam?: string, profile?: Record<string, string>) {
   const fields = new URLSearchParams({
     auth_date: String(date),
     signature: 'synthetic',
-    user: JSON.stringify({ id: telegramId }),
+    user: JSON.stringify({ id: telegramId, ...profile }),
   });
   const key = createHmac('sha256', 'WebAppData').update(botToken).digest();
   if (startParam) fields.set('start_param', startParam);
@@ -27,11 +27,46 @@ function launch(telegramId: number, date: number, startParam?: string) {
 test('Telegram launch validation rejects forged, expired, future and duplicate fields', () => {
   const now = 1_800_000_000;
   const valid = launch(1, now);
-  assert.equal(verifyTelegramId(valid, botToken, now), 1n);
-  assert.equal(verifyTelegramId(valid.replace('%3A1', '%3A2'), botToken, now), null);
-  assert.equal(verifyTelegramId(launch(1, now - 301), botToken, now), null);
-  assert.equal(verifyTelegramId(launch(1, now + 31), botToken, now), null);
-  assert.equal(verifyTelegramId(valid + '&user=duplicate', botToken, now), null);
+  assert.equal(verifyTelegramProfile(valid, botToken, now)?.id, 1n);
+  assert.equal(verifyTelegramProfile(valid.replace('%3A1', '%3A2'), botToken, now), null);
+  assert.equal(verifyTelegramProfile(launch(1, now - 301), botToken, now), null);
+  assert.equal(verifyTelegramProfile(launch(1, now + 31), botToken, now), null);
+  assert.equal(verifyTelegramProfile(valid + '&user=duplicate', botToken, now), null);
+});
+
+test('profile sync verifies identity and only accepts Telegram userpic URLs', async (t) => {
+  const app = Fastify();
+  t.after(() => app.close());
+  const now = Math.floor(Date.now() / 1000);
+  const avatar = 'https://t.me/i/userpic/320/synthetic.svg';
+  const initData = launch(1, now, undefined, {
+    first_name: 'Synthetic', last_name: 'Profile', username: 'FixtureStudent', photo_url: avatar,
+  });
+  assert.equal(verifyTelegramProfile(launch(1, now, undefined, {
+    photo_url: 'https://t.me.example.invalid/i/userpic/test.svg',
+  }), botToken, now)?.telegramAvatarUrl, null);
+  let synced = 0;
+  app.register(authRoutes, {
+    botToken, secret,
+    findByTelegramId: async (id) => id === 1n ? student : null,
+    findById: async () => student,
+    syncStudentProfile: async (id, profile) => {
+      assert.equal(id, student.id);
+      assert.equal(profile.telegramName, 'Synthetic Profile');
+      assert.equal(profile.telegramUsername, 'FixtureStudent');
+      assert.equal(profile.telegramAvatarUrl, avatar);
+      synced += 1;
+    },
+  });
+  const sync = (accountId: string) => app.inject({
+    method: 'POST', url: '/profile', payload: { initData },
+    headers: { authorization: `Bearer ${issueSession(accountId, secret, now)}` },
+  });
+  assert.equal((await sync('00000000-0000-4000-8000-000000000002')).statusCode, 401);
+  assert.equal(synced, 0);
+  assert.equal((await sync(student.id)).statusCode, 204);
+  assert.equal((await app.inject({ method: 'POST', url: '/telegram', payload: { initData } })).statusCode, 200);
+  assert.equal(synced, 2);
 });
 
 test('teachers issue invites and verified Telegram launches redeem them', async (t) => {

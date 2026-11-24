@@ -57,6 +57,7 @@ function fetchAccount(signal: AbortSignal) {
 async function loadAccount(initData: string, inviteCode: string, signal: AbortSignal): Promise<View> {
   const hasInvitation = !!(inviteCode || new URLSearchParams(initData).get('start_param')?.startsWith('invite_'));
   let response = hasInvitation ? undefined : await fetchAccount(signal);
+  const restored = response?.ok === true;
   if (!response || response.status === 401) {
     saveToken('');
     if (!initData) return { state: 'browser' };
@@ -78,6 +79,14 @@ async function loadAccount(initData: string, inviteCode: string, signal: AbortSi
 
   if (!response.ok) return { state: 'error' };
   const account: Account = await response.json();
+  if (restored && account.role === 'STUDENT' && initData && !signal.aborted) {
+    // Profile refresh must not block an existing valid session.
+    void fetch('/api/auth/profile', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${readToken()}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData }), signal,
+    }).catch(() => {});
+  }
   return { state: 'signed-in', account };
 }
 
