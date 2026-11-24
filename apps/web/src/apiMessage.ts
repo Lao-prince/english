@@ -2,6 +2,7 @@ const messages = new Map([
   ['Use a canonical UTC start time.', 'Укажите корректное время начала.'],
   ['Enter a valid IANA time zone.', 'Не удалось определить часовой пояс.'],
   ['A new slot must start in the future.', 'Выберите время, которое ещё не наступило.'],
+  ['New lessons must last 60 minutes.', 'Новый урок длится ровно один час.'],
   ['This time overlaps an open slot.', 'Это время пересекается с другим открытым интервалом.'],
   ['This slot does not exist.', 'Этот интервал больше недоступен.'],
   ['A booked slot cannot be closed.', 'На это время уже записались.'],

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Button, EmptyState, Field, Icon, IconButton, LoadingState, Notice, Panel } from './ui';
 import { apiMessage } from './apiMessage';
-import { LessonTime, ScheduleDays } from './ScheduleDays';
+import { LessonTime } from './LessonTime';
+import { LessonCalendar, localDateKey } from './LessonCalendar';
 
 type Slot = { id: string; startsAt: string; endsAt: string; timeZone: string };
 type Booking = Pick<Slot, 'id' | 'startsAt' | 'endsAt'> & {
@@ -22,9 +23,17 @@ export function Schedule({ teacher, token, view }: { teacher: boolean; token: st
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [revision, setRevision] = useState(0);
-  const [start, setStart] = useState('');
-  const [duration, setDuration] = useState('60');
+  const [day, setDay] = useState(() => new Date());
+  const [startTime, setStartTime] = useState('');
+  const [showPublisher, setShowPublisher] = useState(false);
   const pending = useRef<{ key: string; id: string } | null>(null);
+  const dayKey = localDateKey(day);
+  const keyFor = (entry: Slot | Booking) => localDateKey(new Date(entry.startsAt));
+  const daySlots = slots?.filter((entry) => keyFor(entry) === dayKey);
+  const dayBookings = bookings?.filter((entry) => keyFor(entry) === dayKey);
+  const entries = (view === 'lessons' ? bookings : slots) ?? [];
+  const markedDates = new Set(entries.map(keyFor));
+  const nextEntry = entries.find((entry) => keyFor(entry) > dayKey) ?? entries.find((entry) => keyFor(entry) !== dayKey);
 
   useEffect(() => {
     if (view === 'students') return;
@@ -70,6 +79,7 @@ export function Schedule({ teacher, token, view }: { teacher: boolean; token: st
 
   async function publish(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const start = `${dayKey}T${startTime}`;
     const local = new Date(start);
     const pad = (value: number) => String(value).padStart(2, '0');
     const calendar = `${local.getFullYear()}-${pad(local.getMonth() + 1)}-${pad(local.getDate())}T${pad(local.getHours())}:${pad(local.getMinutes())}`;
@@ -78,17 +88,20 @@ export function Schedule({ teacher, token, view }: { teacher: boolean; token: st
       return;
     }
 
-    const details = { startsAt: local.toISOString(), durationMinutes: Number(duration), timeZone: viewerZone };
+    const details = { startsAt: local.toISOString(), durationMinutes: 60, timeZone: viewerZone };
     const key = JSON.stringify(details);
     if (pending.current?.key !== key) pending.current = { key, id: crypto.randomUUID() };
     if (await mutate(endpoint, { id: pending.current.id, ...details })) {
       pending.current = null;
-      setStart('');
+      setStartTime('');
+      setShowPublisher(false);
+      setNotice('Время открыто для записи.');
     }
   }
 
   return (
     <section className="schedule-stack" hidden={view === 'students'} aria-label="Расписание уроков">
+      <LessonCalendar key={view} selected={day} onSelect={setDay} marked={markedDates} />
       <div className="section-tools">
         <p className="muted">Часовой пояс: <strong>{viewerZoneLabel}</strong></p>
         <IconButton icon="refresh" label="Обновить расписание" variant="quiet" onClick={() => {
@@ -98,35 +111,38 @@ export function Schedule({ teacher, token, view }: { teacher: boolean; token: st
       </div>
       {error && <Notice tone="danger">{error}</Notice>}
       {notice && <Notice tone="success">{notice}</Notice>}
-      <div className={teacher ? 'schedule-grid' : 'schedule-stack'} hidden={view !== 'schedule'}>
-        {teacher && (
+      <div className="schedule-stack" hidden={view !== 'schedule'}>
+        {teacher && <div className="actions">
+          <Button variant="primary" aria-expanded={showPublisher} aria-controls="slot-publisher"
+            onClick={() => setShowPublisher(!showPublisher)}><Icon name="plus" />Добавить время</Button>
+        </div>}
+        {teacher && <div id="slot-publisher" hidden={!showPublisher}>
           <Panel className="slot-form">
-            <h2>Добавить время</h2>
+            <h2>Открыть запись</h2>
             <form onSubmit={publish}>
               <fieldset disabled={busy} className="form-stack">
-                <Field label="Дата и время начала">
-                  <input type="datetime-local" required
-                    value={start} onChange={(event) => setStart(event.target.value)} />
+                <Field label="Время начала">
+                  <input type="time" required value={startTime} onChange={(event) => setStartTime(event.target.value)} />
                 </Field>
-                <Field label="Длительность в минутах">
-                  <input type="number" required min={1} max={1440}
-                    value={duration} onChange={(event) => setDuration(event.target.value)} />
-                </Field>
-                <Button variant="primary" type="submit"><Icon name="plus" />Открыть запись</Button>
+                <p className="muted">Урок длится 1 час.</p>
+                <Button variant="primary" type="submit">Открыть запись</Button>
               </fieldset>
             </form>
           </Panel>
-        )}
+        </div>}
         <section aria-labelledby="availability-heading" className="list-section">
           <h2 id="availability-heading">Свободное время</h2>
           {slots === null && !error && <LoadingState label="Загружаем расписание…" />}
-          {slots?.length === 0 && <EmptyState icon="schedule" title="Свободного времени пока нет">
-            {teacher ? 'Добавьте время, чтобы ученики могли записаться.' : 'Здесь появится время, которое откроет преподаватель.'}
+          {daySlots?.length === 0 && <EmptyState icon="schedule" title="На эту дату нет свободного времени">
+            {teacher ? 'Можно открыть запись на выбранную дату.' : 'Выберите другой день в календаре.'}
           </EmptyState>}
-          {!!slots?.length && (
-            <ScheduleDays items={slots} renderRow={(slot) => (
-                <li key={slot.id} className="item-row">
-                  <p className="item-title"><LessonTime {...slot} /></p>
+          {!!daySlots?.length && (
+            <ul className="lesson-cards">{daySlots.map((slot) => (
+                <li key={slot.id} className="item-row lesson-card">
+                  <div className="lesson-card-main">
+                    <span className="icon-tile"><Icon name="schedule" /></span>
+                    <p className="item-title"><LessonTime {...slot} /></p>
+                  </div>
                   {teacher ? <Button variant="quiet" disabled={busy}
                     aria-label={`Закрыть запись на ${display.format(new Date(slot.startsAt))}`}
                     onClick={() => void mutate(`${endpoint}/${slot.id}/close`)}>Закрыть</Button>
@@ -148,23 +164,25 @@ export function Schedule({ teacher, token, view }: { teacher: boolean; token: st
                         setError('');
                       }}>Записаться <Icon name="arrow" /></Button>}
                 </li>
-            )} />
+            ))}</ul>
           )}
         </section>
       </div>
       <section aria-label="Предстоящие записи" hidden={view !== 'lessons'}>
         {bookings === null && !error && <LoadingState label="Загружаем уроки…" />}
-        {bookings?.length === 0 && <EmptyState icon="lessons" title="Записей пока нет">
-          Здесь появятся предстоящие уроки.
+        {dayBookings?.length === 0 && <EmptyState icon="lessons" title="На эту дату нет уроков">
+          Выберите другой день в календаре.
         </EmptyState>}
-        {!!bookings?.length && (
-          <ScheduleDays items={bookings} heading="h2" renderRow={(booking) => (
-              <li key={booking.id} className="item-row lesson-row">
-                <div>
-                  <p className="item-title"><LessonTime {...booking} /></p>
-                  {booking.studentReference && <p className="muted">
-                    {booking.studentDisplayName ?? `ID ученика: ${booking.studentReference}`}
-                  </p>}
+        {!!dayBookings?.length && (
+          <ul className="lesson-cards">{dayBookings.map((booking) => (
+              <li key={booking.id} className="item-row lesson-row lesson-card lesson-card--booked">
+                <div className="lesson-card-main">
+                  <span className="icon-tile"><Icon name="lessons" /></span>
+                  <div>
+                    <p className="item-title">{booking.studentDisplayName ?? 'Урок английского'}</p>
+                    <p className="muted"><LessonTime {...booking} /></p>
+                    {booking.studentReference && !booking.studentDisplayName && <p className="muted">ID ученика: {booking.studentReference}</p>}
+                  </div>
                 </div>
                 {!teacher && (cancelling === booking.id ? (
                   <div className="confirmation">
@@ -193,9 +211,14 @@ export function Schedule({ teacher, token, view }: { teacher: boolean; token: st
                   aria-label={`Отменить урок на ${display.format(new Date(booking.startsAt))}`}
                   onClick={() => { setCancelling(booking.id); setNotice(''); setError(''); }}>Отменить урок</Button>)}
               </li>
-          )} />
+          ))}</ul>
         )}
       </section>
+      {nextEntry && !(view === 'lessons' ? dayBookings?.length : daySlots?.length) && (
+        <Button onClick={() => setDay(new Date(nextEntry.startsAt))}>
+          {view === 'lessons' ? 'Перейти к дате с уроками' : 'Перейти к дате со свободным временем'} <Icon name="arrow" />
+        </Button>
+      )}
     </section>
   );
 }

@@ -54,7 +54,7 @@ app.register(creditRoutes, {
 
 try {
   await app.listen({ host: process.env.API_HOST ?? '127.0.0.1', port: 3000 });
-  if (process.env.NODE_ENV === 'production' && botToken) {
+  if (process.env.NODE_ENV === 'production' && process.env.LESSON_REMINDERS_ENABLED === 'true' && botToken) {
     stopReminders = lessonReminders(prisma, botToken, () => app.log.warn('Lesson reminder cycle failed'));
   }
 } catch (error) {

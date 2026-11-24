@@ -74,7 +74,7 @@ docker compose -p english-space exec api npm run user:provision -- student STUDE
 
 After provisioning the teacher, new students can join using invitations issued in the Mini App. See [Student invitations](INVITATIONS.md) for optional direct-link setup.
 
-For [lesson reminders](REMINDERS.md), the production API needs outbound HTTPS to Telegram. The teacher and students should start a private chat with the bot so it can send reminders. Reminders work with the Mini App closed.
+[Lesson reminders](REMINDERS.md) are paused by default. If enabled later, the production API needs outbound HTTPS to Telegram and recipients need a private chat with the bot.
 
 ## Stop or update
 

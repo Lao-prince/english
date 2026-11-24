@@ -26,6 +26,7 @@ test('PostgreSQL serializes overlapping publications and preserves mutation retr
     const first = { id: randomUUID(), startsAt, durationMinutes: 60, timeZone: 'UTC' };
     const second = { ...first, id: randomUUID() };
     try {
+      await assert.rejects(schedule.publish({ ...first, durationMinutes: 30 }), { statusCode: 400 });
       const attempts = await Promise.allSettled([schedule.publish(first), schedule.publish(second)]);
       const winners = attempts.flatMap((attempt) => attempt.status === 'fulfilled' ? [attempt.value] : []);
       const losers = attempts.flatMap((attempt) => attempt.status === 'rejected' ? [attempt.reason] : []);

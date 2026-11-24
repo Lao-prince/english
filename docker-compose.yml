@@ -65,6 +65,7 @@ services:
       SESSION_SECRET: "${SESSION_SECRET:?Set SESSION_SECRET in .env}"
       TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:?Set TELEGRAM_BOT_TOKEN in .env}"
       TELEGRAM_BOT_USERNAME: "${TELEGRAM_BOT_USERNAME:-}"
+      LESSON_REMINDERS_ENABLED: "${LESSON_REMINDERS_ENABLED:-false}"
     depends_on:
       migrate:
         condition: service_completed_successfully

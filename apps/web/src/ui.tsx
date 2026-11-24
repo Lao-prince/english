@@ -1,6 +1,10 @@
 import type { ButtonHTMLAttributes, FormEvent, ReactNode } from 'react';
 
 export const paths = {
+  left: 'm15 6-6 6 6 6',
+  right: 'm9 6 6 6-6 6',
+  up: 'm6 15 6-6 6 6',
+  down: 'm6 9 6 6 6-6',
   schedule: 'M7 3v4m10-4v4M4 10h16M6 5h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm2 9h2m4 0h2m-8 3h2',
   lessons: 'M12 6a7 7 0 1 0 0 14 7 7 0 0 0 0-14Zm0 4v3l2 2M9 3h6',
   students: 'M16 20v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2m16 0v-2a4 4 0 0 0-2-3.5M9.5 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7-7a3.5 3.5 0 0 1 0 7',

@@ -60,6 +60,7 @@ export function availability(prisma: PrismaClient) {
           }
           return existing;
         }
+        if (input.durationMinutes !== 60) throw new ScheduleError(400, 'New lessons must last 60 minutes.');
         if (startsAt <= new Date()) throw new ScheduleError(400, 'A new slot must start in the future.');
         const overlap = await tx.availabilitySlot.findFirst({
           where: { closedAt: null, startsAt: { lt: endsAt }, endsAt: { gt: startsAt } },

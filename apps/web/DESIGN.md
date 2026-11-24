@@ -1,5 +1,9 @@
 # English Space interface
 
+## Calendar update
+
+Schedule and Lessons share a local-date selection, a compact week strip, and an expandable month. A marker shows which dates have entries in the current view. The selected date controls the lesson cards and the teacher's slot form. The existing mobile navigation uses an inset, floating dock with the original English Space pink accent.
+
 ## Pink redesign
 
 The existing workspace has Schedule, Upcoming lessons and Students, plus access and invitation states. Schedule includes publishing, booking and cancellation. Students includes invitations, roster editing and credit management. Students can see their own credit activity in Lessons. An audit found English copy and English server errors exposed directly in forms, a violet brand palette, and Telegram integration that only read the light or dark setting.

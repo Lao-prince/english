@@ -129,9 +129,27 @@ h2 { color: var(--section-title); font-size: var(--text-section); font-weight: 6
 .section-tools { justify-content: space-between; }
 .schedule-grid { display: grid; gap: var(--space-6); }
 .item-list { list-style: none; padding: 0; margin: 0; border-block-start: var(--border-width) solid var(--border); }
-.schedule-days { display: grid; gap: var(--space-6); }
-.schedule-day-title { color: var(--subtitle); font-size: var(--text-small); font-weight: 650; margin-block-end: var(--space-2); }
-.schedule-day-title::first-letter { text-transform: uppercase; }
+.lesson-calendar { padding: var(--space-3); border-radius: var(--radius-panel); background: var(--surface); }
+.calendar-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-1); }
+.calendar-toggle { flex-wrap: wrap; justify-content: start; padding-inline: var(--space-2); text-align: start; }
+.calendar-toggle > span { text-transform: capitalize; }
+.calendar-arrows { flex: none; gap: 0; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .125rem; margin-block: var(--space-2); }
+.calendar-weekday { color: var(--text-secondary); font-size: var(--text-small); text-align: center; }
+.calendar-day { display: grid; min-block-size: var(--control-size); gap: .125rem; place-items: center; padding-block: var(--space-1); border-radius: var(--radius-control); }
+.calendar-day:hover { background: var(--surface-secondary); }
+.calendar-day[aria-pressed="true"] { background: var(--brand-pink); color: var(--on-brand); font-weight: 700; }
+.calendar-day[aria-pressed="true"] .calendar-weekday { color: inherit; }
+.calendar-day[aria-current="date"] .calendar-number { text-decoration: underline; text-underline-offset: .2em; }
+.calendar-number { font-variant-numeric: tabular-nums; }
+.calendar-dot { inline-size: .3rem; block-size: .3rem; border-radius: 50%; }
+.calendar-dot--marked { background: currentColor; }
+.calendar-footer { padding: var(--space-2); border-block-start: 1px solid var(--border); font-size: var(--text-small); }
+.calendar-footer strong::first-letter { text-transform: uppercase; }
+.lesson-cards { display: grid; gap: var(--space-2); padding: 0; margin: 0; list-style: none; }
+.lesson-card { background: var(--surface); border: 0; padding: var(--space-3); border-radius: var(--radius-panel); }
+.lesson-card-main { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.lesson-card--booked .icon-tile { background: var(--brand-pink); color: var(--on-brand); }
 .item-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); padding-block: var(--space-4); border-block-end: var(--border-width) solid var(--border); overflow-wrap: anywhere; }
 .confirmation { display: grid; gap: var(--space-2); flex-basis: 100%; }
 .notice, .loading, .empty { padding: var(--space-4); border-radius: var(--radius-control); }
@@ -150,6 +168,17 @@ h2 { color: var(--section-title); font-size: var(--text-section); font-weight: 6
 .access-panel { padding: var(--space-6); }
 
 @media (max-width: 47.999rem) {
+  .app-nav {
+    inset-inline: 0;
+    inset-block-end: calc(var(--space-2) + var(--safe-bottom));
+    inline-size: min(calc(100% - 2 * var(--gutter)), 25rem);
+    margin-inline: auto;
+    min-block-size: 3.75rem;
+    padding: var(--space-1);
+    border: 1px solid var(--border);
+    border-radius: 2rem;
+    box-shadow: 0 4px 20px #0002;
+  }
   .workspace:has(.field:focus-within) .app-nav { visibility: hidden; }
 }
 @media (min-width: 48rem) {
