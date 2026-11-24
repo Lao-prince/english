@@ -14,4 +14,16 @@ Before the lesson starts, its owner may cancel. The teacher's IANA zone stored o
 
 `GET /api/schedule/bookings` gives students a `cancellationChargeApplies` preview. `POST /api/schedule/bookings/:id/cancel` accepts `{ acceptSameDayCharge: boolean }` and returns `id`, `cancelledAt`, and `chargeApplies`. The server recalculates the policy inside the transaction. A missing or foreign booking returns 404. A lesson that already started, or a same-day charge without acknowledgement, returns 409. The UI refreshes the preview after a conflict. The database persists the cancellation instant and charge classification together.
 
+## Teacher cancellation
+
+Before a booked lesson starts, the teacher can cancel it from Schedule. An optional reason of up to 200 characters is visible to the student. The default closes the slot. The teacher can choose to make it available again. Cancellation is terminal and never chargeable when initiated by the teacher. The booking and slot changes commit together using the existing calendar lock.
+
+`POST /api/schedule/bookings/:id/teacher-cancel` accepts `{ reopenSlot: boolean, reason?: string }` and returns `{ id, cancelledAt, reopenedSlot, reason }`. A retry returns the original decision. Missing bookings return 404. A student cancellation, completion, or lesson already started returns 409. Student history identifies teacher cancellations as `CANCELLED_BY_TEACHER` and includes the shared reason when provided. Existing cancellations remain student cancellations.
+
+## Teacher rescheduling
+
+Before an active lesson starts, the teacher can move it to a different, open future slot. The teacher may reopen the previous slot. The default closes it. The change preserves the booking ID and student, and has no effect on the credit ledger. The calendar lock serializes the move against bookings and cancellations. Each move stores the actor, source and destination slot references, and the UTC change time. Slots preserve their original time intervals.
+
+`POST /api/schedule/bookings/:id/reschedule` requires a teacher session and accepts `{ requestId, slotId, reopenPreviousSlot }`. It returns the immutable move record. Identical retries return that record even after another move. Reusing a request ID with different details returns 409. Missing records return 404. Started or terminal bookings, an unchanged destination, and a closed, past or occupied destination return 409. The existing booking routes include move history in upcoming lessons and student history. Original booking retries retain their existing booking and return its current slot.
+
 Run `npm test` for route authorization checks. Set `TEST_DATABASE_URL` to an isolated, migrated PostgreSQL database to run the concurrency, ownership and retry checks.

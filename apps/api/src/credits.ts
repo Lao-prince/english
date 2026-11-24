@@ -56,6 +56,40 @@ export function creditLedger(prisma: PrismaClient) {
     }, { isolationLevel: 'ReadCommitted' });
   }
 
+  function recordOutcome(studentId: string, bookingId: string, allowCompletionWithoutCredit: boolean) {
+    return writeForStudent(studentId, async (tx) => {
+      const booking = await tx.booking.findFirst({
+        where: { id: bookingId, studentId },
+        select: {
+          completedAt: true, cancelledAt: true, chargeApplies: true,
+          slot: { select: { endsAt: true } }, creditEntry: { select: entryFields },
+        },
+      });
+      if (!booking) throw new CreditError(404, 'Booking not found.');
+      if (allowCompletionWithoutCredit && booking.cancelledAt) {
+        throw new CreditError(409, 'A cancelled lesson cannot be marked completed.');
+      }
+      if (booking.creditEntry || booking.completedAt) {
+        return { completedAt: booking.completedAt, entry: booking.creditEntry };
+      }
+
+      const now = new Date();
+      const reason = settlementReason(booking, now);
+      if (!reason) throw new CreditError(409, 'This lesson is not eligible for settlement.');
+      const { balance, packages } = await creditBalances(tx, studentId, now);
+      if (balance < 1 && !allowCompletionWithoutCredit) {
+        throw new CreditError(409, 'Add lesson credits before settling this lesson.');
+      }
+      const completedAt = reason === 'COMPLETED_LESSON' ? now : null;
+      if (completedAt) await tx.booking.update({ where: { id: bookingId }, data: { completedAt } });
+      const pack = packages.find(({ expired, remaining }) => !expired && remaining > 0);
+      const entry = balance > 0 ? await tx.creditEntry.create({
+        data: { studentId, bookingId, packageId: pack?.id, amount: -1, reason }, select: entryFields,
+      }) : null;
+      return { completedAt, entry };
+    });
+  }
+
   return {
     summary(studentId: string, includePending: boolean) {
       return prisma.$transaction(async (tx) => {
@@ -71,7 +105,7 @@ export function creditLedger(prisma: PrismaClient) {
           includePending ? tx.booking.findMany({
             where: { studentId, creditEntry: null, OR: [
               { cancelledAt: { not: null }, chargeApplies: true },
-              { cancelledAt: null, slot: { endsAt: { lte: now } } },
+              { cancelledAt: null, completedAt: null, slot: { endsAt: { lte: now } } },
             ] },
             orderBy: { slot: { startsAt: 'asc' } },
             select: { id: true, cancelledAt: true, chargeApplies: true, slot: { select: { startsAt: true, endsAt: true } } },
@@ -111,24 +145,13 @@ export function creditLedger(prisma: PrismaClient) {
         return tx.creditEntry.findUniqueOrThrow({ where: { id }, select: entryFields });
       });
     },
-    settle(studentId: string, bookingId: string) {
-      return writeForStudent(studentId, async (tx) => {
-        const booking = await tx.booking.findFirst({
-          where: { id: bookingId, studentId },
-          select: { cancelledAt: true, chargeApplies: true, slot: { select: { endsAt: true } }, creditEntry: { select: entryFields } },
-        });
-        if (!booking) throw new CreditError(404, 'Booking not found.');
-        if (booking.creditEntry) return booking.creditEntry;
-        const now = new Date();
-        const reason = settlementReason(booking, now);
-        if (!reason) throw new CreditError(409, 'This lesson is not eligible for settlement.');
-        const { balance, packages } = await creditBalances(tx, studentId, now);
-        if (balance < 1) throw new CreditError(409, 'Add lesson credits before settling this lesson.');
-        const pack = packages.find(({ expired, remaining }) => !expired && remaining > 0);
-        return tx.creditEntry.create({
-          data: { studentId, bookingId, packageId: pack?.id, amount: -1, reason }, select: entryFields,
-        });
-      });
+    async settle(studentId: string, bookingId: string) {
+      const { entry } = await recordOutcome(studentId, bookingId, false);
+      if (!entry) throw new CreditError(409, 'This lesson was completed without a credit debit.');
+      return entry;
+    },
+    complete(studentId: string, bookingId: string) {
+      return recordOutcome(studentId, bookingId, true);
     },
     reverse(studentId: string, entryId: string) {
       return writeForStudent(studentId, async (tx) => {

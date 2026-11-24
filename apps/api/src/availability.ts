@@ -33,6 +33,11 @@ export function sameLessonDay(now: Date, startsAt: Date, timeZone: string) {
 }
 
 const activeBookings = { where: { cancelledAt: null }, take: 1 };
+const slotTimes = { startsAt: true, endsAt: true } as const;
+const moveHistory = {
+  orderBy: [{ createdAt: 'desc' as const }, { id: 'desc' as const }],
+  select: { id: true, fromStartsAt: true, fromEndsAt: true, toStartsAt: true, toEndsAt: true, createdAt: true },
+};
 
 export function availability(prisma: PrismaClient) {
   const slots = prisma.availabilitySlot;
@@ -90,13 +95,16 @@ export function availability(prisma: PrismaClient) {
         if (!slot) throw new ScheduleError(404, 'This slot does not exist.');
         const times = { slotId, startsAt: slot.startsAt, endsAt: slot.endsAt };
         const previous = requestId
-          ? await tx.booking.findUnique({ where: { id: requestId } })
-          : await tx.booking.findFirst({ where: { slotId, studentId }, orderBy: { createdAt: 'desc' } });
+          ? await tx.booking.findUnique({ where: { id: requestId }, include: { slot: { select: slotTimes } } })
+          : await tx.booking.findFirst({
+            where: { studentId, OR: [{ slotId }, { originalSlotId: slotId }] },
+            orderBy: { createdAt: 'desc' }, include: { slot: { select: slotTimes } },
+          });
         if (previous) {
-          if (previous.slotId !== slotId || previous.studentId !== studentId) {
+          if (previous.studentId !== studentId || (requestId && (previous.originalSlotId ?? previous.slotId) !== slotId)) {
             throw new ScheduleError(409, 'This booking request ID is already in use.');
           }
-          return { id: previous.id, ...times };
+          return { id: previous.id, slotId: previous.slotId, ...previous.slot };
         }
         const [active] = slot.bookings;
         if (active || slot.closedAt || slot.startsAt <= new Date()) {
@@ -114,6 +122,7 @@ export function availability(prisma: PrismaClient) {
         });
         if (!booking) throw new ScheduleError(404, 'This booking does not exist.');
         const { cancelledAt, chargeApplies } = booking;
+        if (booking.cancelledByTeacher) throw new ScheduleError(409, 'The teacher already cancelled this lesson.');
         if (cancelledAt) return { id, cancelledAt, chargeApplies };
 
         const now = new Date();
@@ -130,6 +139,91 @@ export function availability(prisma: PrismaClient) {
         });
       });
     },
+    cancelByTeacher(id: string, reopenSlot: boolean, reason?: string) {
+      return writeCalendar(async (tx) => {
+        const booking = await tx.booking.findUnique({
+          where: { id }, include: { slot: { select: { startsAt: true } } },
+        });
+        if (!booking) throw new ScheduleError(404, 'This booking does not exist.');
+        if (booking.cancelledAt) {
+          if (!booking.cancelledByTeacher) throw new ScheduleError(409, 'The student already cancelled this lesson.');
+          return {
+            id, cancelledAt: booking.cancelledAt, reopenedSlot: booking.reopenedOnCancellation,
+            reason: booking.cancellationReason,
+          };
+        }
+        const cancelledAt = new Date();
+        if (booking.completedAt || booking.slot.startsAt <= cancelledAt) {
+          throw new ScheduleError(409, 'The lesson has already started.');
+        }
+        const sharedReason = reason?.trim() || null;
+        await tx.booking.update({ where: { id }, data: {
+          cancelledAt, cancelledByTeacher: true, reopenedOnCancellation: reopenSlot,
+          cancellationReason: sharedReason, chargeApplies: false,
+        } });
+        await tx.availabilitySlot.update({
+          where: { id: booking.slotId }, data: { closedAt: reopenSlot ? null : cancelledAt },
+        });
+        return { id, cancelledAt, reopenedSlot: reopenSlot, reason: sharedReason };
+      });
+    },
+    reschedule(id: string, teacherId: string, input: { requestId: string; slotId: string; reopenPreviousSlot: boolean }) {
+      return writeCalendar(async (tx) => {
+        const previous = await tx.bookingMove.findUnique({ where: { id: input.requestId } });
+        if (previous) {
+          if (previous.bookingId !== id || previous.teacherId !== teacherId || previous.toSlotId !== input.slotId ||
+              previous.reopenedPreviousSlot !== input.reopenPreviousSlot) {
+            throw new ScheduleError(409, 'This reschedule request ID is already in use.');
+          }
+          return previous;
+        }
+        const booking = await tx.booking.findUnique({ where: { id }, include: { slot: { select: slotTimes } } });
+        if (!booking) throw new ScheduleError(404, 'This booking does not exist.');
+        const now = new Date();
+        if (booking.cancelledAt || booking.completedAt || booking.slot.startsAt <= now) {
+          throw new ScheduleError(409, 'Only upcoming lessons can be rescheduled.');
+        }
+        if (booking.slotId === input.slotId) throw new ScheduleError(409, 'Choose a different slot.');
+        const target = await tx.availabilitySlot.findUnique({
+          where: { id: input.slotId }, include: { bookings: activeBookings },
+        });
+        if (!target) throw new ScheduleError(404, 'This slot does not exist.');
+        if (target.closedAt || target.startsAt <= new Date() || target.bookings.length) {
+          throw new ScheduleError(409, 'This time is no longer available.');
+        }
+        await tx.booking.update({ where: { id }, data: {
+          slotId: target.id, originalSlotId: booking.originalSlotId ?? booking.slotId,
+        } });
+        await tx.availabilitySlot.update({ where: { id: booking.slotId }, data: {
+          closedAt: input.reopenPreviousSlot ? null : now,
+        } });
+        return tx.bookingMove.create({ data: {
+          id: input.requestId, bookingId: id, teacherId, fromSlotId: booking.slotId, toSlotId: target.id,
+          fromStartsAt: booking.slot.startsAt, fromEndsAt: booking.slot.endsAt,
+          toStartsAt: target.startsAt, toEndsAt: target.endsAt, reopenedPreviousSlot: input.reopenPreviousSlot,
+          createdAt: now,
+        } });
+      });
+    },
+    async history(studentId: string) {
+      const bookings = await prisma.booking.findMany({
+        where: { studentId, OR: [
+          { cancelledAt: { not: null } }, { completedAt: { not: null } },
+        ] },
+        orderBy: [{ slot: { startsAt: 'desc' } }, { id: 'desc' }],
+        take: 30,
+        select: {
+          id: true, cancelledAt: true, cancelledByTeacher: true, cancellationReason: true,
+          slot: { select: { startsAt: true, endsAt: true } },
+          moves: moveHistory,
+        },
+      });
+      return bookings.map(({ id, cancelledAt, cancelledByTeacher, cancellationReason, slot, moves }) => ({
+        id, ...slot, cancelledAt, cancellationReason, ...(moves?.length && { moves }),
+        status: cancelledByTeacher ? 'CANCELLED_BY_TEACHER' as const
+          : cancelledAt ? 'CANCELLED_BY_STUDENT' as const : 'COMPLETED' as const,
+      }));
+    },
     async upcoming(account: { id: string; role: 'TEACHER' | 'STUDENT' }) {
       const teacher = account.role === 'TEACHER';
       const now = new Date();
@@ -138,11 +232,13 @@ export function availability(prisma: PrismaClient) {
         orderBy: { slot: { startsAt: 'asc' } },
         select: {
           id: true, slotId: true, slot: { select: { startsAt: true, endsAt: true, timeZone: true } },
+          moves: moveHistory,
           student: teacher ? { select: { id: true, telegramId: true, displayName: true } } : false,
         },
       });
-      return bookings.map(({ id, slotId, slot, student }) => ({
+      return bookings.map(({ id, slotId, slot, student, moves }) => ({
         id, slotId, startsAt: slot.startsAt, endsAt: slot.endsAt,
+        ...(moves.length && { moves }),
         ...(student
           ? { studentReference: student.telegramId?.toString() ?? student.id, studentDisplayName: student.displayName }
           : { cancellationChargeApplies: sameLessonDay(now, slot.startsAt, slot.timeZone) }),

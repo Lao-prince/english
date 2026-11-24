@@ -44,6 +44,7 @@ model User {
   bookings   Booking[]
   creditEntries CreditEntry[]
   lessonReminders LessonReminder[]
+  bookingMoves BookingMove[]
 }
 
 model AvailabilitySlot {
@@ -60,17 +61,41 @@ model AvailabilitySlot {
 model Booking {
   id        String           @id @default(uuid()) @db.Uuid
   slotId    String           @db.Uuid
+  originalSlotId String?    @db.Uuid
   studentId String           @db.Uuid
   createdAt DateTime         @default(now()) @db.Timestamptz(3)
   cancelledAt DateTime?      @db.Timestamptz(3)
+  completedAt DateTime?      @db.Timestamptz(3)
+  cancelledByTeacher Boolean @default(false)
+  reopenedOnCancellation Boolean @default(false)
+  cancellationReason String? @db.VarChar(200)
   chargeApplies Boolean      @default(false)
   slot      AvailabilitySlot @relation(fields: [slotId], references: [id], onDelete: Restrict)
   student   User             @relation(fields: [studentId], references: [id], onDelete: Restrict)
   creditEntry CreditEntry?
   reminders LessonReminder[]
+  moves BookingMove[]
 
   @@index([studentId])
   @@index([slotId, studentId, createdAt])
+}
+
+model BookingMove {
+  id                 String   @id @db.Uuid
+  bookingId          String   @db.Uuid
+  teacherId          String   @db.Uuid
+  fromSlotId         String   @db.Uuid
+  toSlotId           String   @db.Uuid
+  fromStartsAt       DateTime @db.Timestamptz(3)
+  fromEndsAt         DateTime @db.Timestamptz(3)
+  toStartsAt         DateTime @db.Timestamptz(3)
+  toEndsAt           DateTime @db.Timestamptz(3)
+  reopenedPreviousSlot Boolean
+  createdAt          DateTime @default(now()) @db.Timestamptz(3)
+  booking            Booking  @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  teacher            User     @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+
+  @@index([bookingId, createdAt])
 }
 
 model LessonReminder {

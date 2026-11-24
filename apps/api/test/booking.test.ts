@@ -34,6 +34,44 @@ test('schedule mutations enforce roles before handling a booking', async (t) => 
   assert.equal((await request('/slots/invalid/book', teacherId)).statusCode, 403);
   assert.equal((await request('/slots/invalid/book', studentId)).statusCode, 400);
   assert.equal((await request('/slots/invalid/close', studentId)).statusCode, 403);
+  assert.equal((await request('/bookings/invalid/teacher-cancel', studentId)).statusCode, 403);
+  assert.equal((await request('/bookings/invalid/reschedule', studentId)).statusCode, 403);
+  assert.equal((await request('/bookings/invalid/reschedule', teacherId)).statusCode, 400);
+});
+
+test('lesson history queries only the student from the verified session', async (t) => {
+  const app = Fastify();
+  t.after(() => app.close());
+  const teacherId = randomUUID();
+  const studentId = randomUUID();
+  const secret = 'synthetic-history-key';
+  const day = new Date('2030-01-01T10:00:00Z');
+  let queries = 0;
+  const prisma = {
+    user: { findUnique: async ({ where }: { where: { id: string } }) =>
+      ({ id: where.id, role: where.id === teacherId ? 'TEACHER' : 'STUDENT' }) },
+    booking: { findMany: async (query: { where: { studentId: string }; take: number }) => {
+      assert.equal(query.where.studentId, studentId);
+      assert.equal(query.take, 30);
+      queries += 1;
+      return [
+        { id: 'completed', cancelledAt: null, slot: { startsAt: day, endsAt: day } },
+        { id: 'cancelled', cancelledAt: day, slot: { startsAt: day, endsAt: day } },
+      ];
+    } },
+  } as unknown as PrismaClient;
+  app.register(scheduleRoutes, { prisma, secret });
+  const path = '/bookings/history';
+  const headers = (id: string) => ({
+    authorization: `Bearer ${issueSession(id, secret, Math.floor(Date.now() / 1000))}`,
+  });
+  assert.equal((await app.inject(path)).statusCode, 401);
+  assert.equal((await app.inject({ url: path, headers: headers(teacherId) })).statusCode, 403);
+  const result = await app.inject({ url: `${path}?studentId=${teacherId}`, headers: headers(studentId) });
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.headers['cache-control'], 'no-store');
+  assert.deepEqual(result.json().map(({ status }: { status: string }) => status), ['COMPLETED', 'CANCELLED_BY_STUDENT']);
+  assert.equal(queries, 1);
 });
 
 const url = process.env.TEST_DATABASE_URL;
@@ -71,10 +109,26 @@ test('PostgreSQL booking is exclusive, retry-safe and visible only to the permit
       const cancelled = await calendar.cancel(winning.value.id, students[winner], false);
       assert.equal(cancelled.chargeApplies, false);
       assert.deepEqual(await calendar.cancel(winning.value.id, students[winner], true), cancelled);
+      assert.deepEqual((await calendar.history(students[winner])).map(({ id, status }) => ({ id, status })),
+        [{ id: winning.value.id, status: 'CANCELLED_BY_STUDENT' }]);
+      assert.deepEqual(await calendar.history(students[1 - winner]), []);
       assert.ok((await calendar.list()).some(({ id }) => id === slot));
       assert.deepEqual(await calendar.book(slot, students[winner], winning.value.id), winning.value);
       const replacement = await calendar.book(slot, students[winner], randomUUID());
       assert.notEqual(replacement.id, winning.value.id);
+      const byTeacher = await calendar.cancelByTeacher(replacement.id, true, '  Test reason  ');
+      assert.equal(byTeacher.reason, 'Test reason');
+      assert.deepEqual(await calendar.cancelByTeacher(replacement.id, false), byTeacher);
+      await assert.rejects(calendar.cancel(replacement.id, students[winner], true), { statusCode: 409 });
+      assert.ok((await calendar.list()).some(({ id }) => id === slot));
+      const history = await calendar.history(students[winner]);
+      assert.ok(history.some(({ id, status, cancellationReason }) =>
+        id === replacement.id && status === 'CANCELLED_BY_TEACHER' && cancellationReason === 'Test reason'));
+      const newBooking = await calendar.book(slot, students[1 - winner], randomUUID());
+      await calendar.cancelByTeacher(newBooking.id, false);
+      assert.ok(!(await calendar.list()).some(({ id }) => id === slot));
+      const stored = await prisma.booking.findUniqueOrThrow({ where: { id: newBooking.id } });
+      assert.equal(stored.chargeApplies, false);
     } finally {
       try {
         await prisma.booking.deleteMany({ where: { slotId: { in: slotIds } } });

@@ -54,6 +54,12 @@ export async function creditRoutes(app: FastifyInstance, { secret, ledger, findA
       type: 'object', additionalProperties: false, required: ['bookingId'], properties: { bookingId: uuid },
     } },
   }, async (request) => ledger.settle(request.params.id, request.body.bookingId));
+  app.post<{ Params: { id: string }; Body: { bookingId: string } }>('/students/:id/complete', {
+    onRequest: teacherOnly,
+    schema: { params, body: {
+      type: 'object', additionalProperties: false, required: ['bookingId'], properties: { bookingId: uuid },
+    } },
+  }, async (request) => ledger.complete(request.params.id, request.body.bookingId));
   app.post<{ Params: { id: string }; Body: { entryId: string } }>('/students/:id/reverse', {
     onRequest: teacherOnly,
     schema: { params, body: {

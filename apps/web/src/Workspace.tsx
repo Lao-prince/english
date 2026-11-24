@@ -5,12 +5,17 @@ import { StudentRoster } from './StudentRoster';
 import { CreditLedger } from './CreditLedger';
 import { Badge, fieldValidation, Icon } from './ui';
 
-const views = [
-  { id: 'schedule', label: 'Расписание', title: 'Расписание' },
-  { id: 'lessons', label: 'Уроки', title: 'Предстоящие уроки' },
-  { id: 'students', label: 'Ученики', title: 'Ученики' },
+const teacherViews = [
+  { id: 'lessons', label: 'Расписание', title: 'Расписание', icon: 'schedule' },
+  { id: 'schedule', label: 'Слоты', title: 'Свободные слоты', icon: 'lessons' },
+  { id: 'students', label: 'Ученики', title: 'Ученики', icon: 'students' },
 ] as const;
-type ViewId = typeof views[number]['id'];
+const studentViews = [
+  { id: 'lessons', label: 'Занятия', title: 'Занятия', icon: 'lessons' },
+  { id: 'schedule', label: 'Запись', title: 'Запись на урок', icon: 'schedule' },
+  { id: 'subscription', label: 'Абонемент', title: 'Абонемент', icon: 'subscription' },
+] as const;
+type ViewId = (typeof teacherViews | typeof studentViews)[number]['id'];
 const readView = () => new URLSearchParams(window.location.search).get('view');
 
 export function Brand() {
@@ -21,8 +26,8 @@ export function Workspace({ teacher, token }: { teacher: boolean; token: string 
   const [requested, setRequested] = useState(readView);
   const heading = useRef<HTMLHeadingElement>(null);
   const moveFocus = useRef(false);
-  const allowed = teacher ? views : views.slice(0, 2);
-  const current = allowed.find(({ id }) => id === requested) ?? views[0];
+  const allowed = teacher ? teacherViews : studentViews;
+  const current = allowed.find(({ id }) => id === requested) ?? allowed[0];
 
   useEffect(() => {
     const restore = () => {
@@ -43,7 +48,7 @@ export function Workspace({ teacher, token }: { teacher: boolean; token: string 
 
   function viewUrl(id: ViewId) {
     const url = new URL(window.location.href);
-    if (id === 'schedule') url.searchParams.delete('view');
+    if (id === allowed[0].id) url.searchParams.delete('view');
     else url.searchParams.set('view', id);
     return url;
   }
@@ -54,7 +59,7 @@ export function Workspace({ teacher, token }: { teacher: boolean; token: string 
         <div className="header-inner">
           <Brand />
           <nav className="app-nav" aria-label="Разделы приложения">
-            {allowed.map(({ id, label }) => (
+            {allowed.map(({ id, label, icon }) => (
               <a href={viewUrl(id).href} key={id} aria-current={current.id === id ? 'page' : undefined}
                 onClick={(event) => {
                   if (event.button || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
@@ -64,7 +69,7 @@ export function Workspace({ teacher, token }: { teacher: boolean; token: string 
                   moveFocus.current = true;
                   setRequested(id);
                 }}>
-                <span className="nav-icon"><Icon name={id} /></span><span>{label}</span>
+                <span className="nav-icon"><Icon name={icon} /></span><span>{label}</span>
               </a>
             ))}
           </nav>
@@ -76,7 +81,7 @@ export function Workspace({ teacher, token }: { teacher: boolean; token: string 
           <h1 ref={heading} tabIndex={-1}>{current.title}</h1>
         </div>
         <Schedule teacher={teacher} token={token} view={current.id} />
-        {!teacher && current.id === 'lessons' && <div className="lesson-credits"><CreditLedger token={token} /></div>}
+        {!teacher && current.id === 'subscription' && <CreditLedger token={token} />}
         {teacher && <div className="schedule-grid" hidden={current.id !== 'students'}>
           <StudentInvitations token={token} />
           <StudentRoster active={current.id === 'students'} token={token} />

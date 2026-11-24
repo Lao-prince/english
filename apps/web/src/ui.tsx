@@ -1,6 +1,7 @@
 import type { ButtonHTMLAttributes, FormEvent, ReactNode } from 'react';
 
 export const paths = {
+  subscription: 'M4 7h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Zm-2 4h20M6 15h4',
   left: 'm15 6-6 6 6 6',
   right: 'm9 6 6 6-6 6',
   up: 'm6 15 6-6 6 6',

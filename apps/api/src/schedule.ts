@@ -40,6 +40,8 @@ export async function scheduleRoutes(
 
   app.get('/slots', async () => schedule.list());
   app.get('/bookings', async (request) => schedule.upcoming(accountFor(request)));
+  app.get('/bookings/history', { onRequest: requireRole('STUDENT') },
+    async (request) => schedule.history(accountFor(request).id));
   app.post<{ Body: Publication }>('/slots', { onRequest: requireRole('TEACHER'), schema: { body: publication } },
     async (request) => schedule.publish(request.body));
   app.post<{ Params: { id: string } }>('/slots/:id/close', {
@@ -61,4 +63,22 @@ export async function scheduleRoutes(
       },
     },
   }, async (request) => schedule.cancel(request.params.id, accountFor(request).id, request.body.acceptSameDayCharge));
+  app.post<{ Params: { id: string }; Body: { reopenSlot: boolean; reason?: string } }>('/bookings/:id/teacher-cancel', {
+    onRequest: requireRole('TEACHER'),
+    schema: {
+      params: slotParams,
+      body: {
+        type: 'object', additionalProperties: false, required: ['reopenSlot'],
+        properties: { reopenSlot: { type: 'boolean' }, reason: { type: 'string', maxLength: 200 } },
+      },
+    },
+  }, async (request) => schedule.cancelByTeacher(request.params.id, request.body.reopenSlot, request.body.reason));
+  app.post<{ Params: { id: string }; Body: { requestId: string; slotId: string; reopenPreviousSlot: boolean } }>(
+    '/bookings/:id/reschedule', {
+      onRequest: requireRole('TEACHER'),
+      schema: { params: slotParams, body: {
+        type: 'object', additionalProperties: false, required: ['requestId', 'slotId', 'reopenPreviousSlot'],
+        properties: { requestId: uuid, slotId: uuid, reopenPreviousSlot: { type: 'boolean' } },
+      } },
+    }, async (request) => schedule.reschedule(request.params.id, accountFor(request).id, request.body));
 }

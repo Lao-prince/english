@@ -27,6 +27,12 @@ erDiagram
 
 ## Planned constraints
 
+Booking moves retain the booking ID and store a snapshot of the original and new times, the teacher, and the operation ID. Moving a booking uses the same active-slot uniqueness constraint as booking. See [Student booking](BOOKING.md).
+
+Teacher cancellations keep the optional student-facing reason and the reopening decision. A database check prevents teacher cancellations from being chargeable. See [Student booking](BOOKING.md).
+
+Bookings record completion independently of ledger settlement. A check constraint excludes simultaneous cancellation and completion. Existing completed-lesson debits backfill the completion timestamp. See [Lesson credit ledger](CREDITS.md).
+
 Lesson reminders use a composite booking and recipient key to prevent duplicate deliveries. Delivery state and retry timing are recorded separately from the booking. See [Lesson reminders](REMINDERS.md).
 
 The lesson credit ledger stores immutable grants, debits and debit reversals. Dated grants are packages, and debits and reversals keep a reference to their source package. Existing credits remain non-expiring. A unique booking reference prevents duplicate settlement, and a unique self-reference ensures a debit can be reversed once. Writes lock the student's account row to protect concurrent balance changes. See [Lesson credit ledger](CREDITS.md).

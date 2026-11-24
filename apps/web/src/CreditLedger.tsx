@@ -45,7 +45,7 @@ export function CreditLedger({ token, studentId }: { token: string; studentId?: 
     return () => controller.abort();
   }, [endpoint, revision, token]);
 
-  async function save(action: 'grant' | 'settle' | 'reverse', body: object, text: string) {
+  async function save(action: 'grant' | 'settle' | 'reverse' | 'complete', body: object, text: string) {
     setBusy(true);
     setFeedback(null);
     try {
@@ -57,6 +57,12 @@ export function CreditLedger({ token, studentId }: { token: string; studentId?: 
       if (!response.ok) {
         setFeedback({ tone: 'danger', text: await apiMessage(response, 'Не удалось обновить баланс. Попробуйте ещё раз.') });
         return false;
+      }
+      if (action === 'complete') {
+        const outcome: { entry: object | null } = await response.json();
+        text = outcome.entry
+          ? 'Урок отмечен проведённым. Одно занятие списано.'
+          : 'Урок отмечен проведённым без списания.';
       }
       setFeedback({ tone: 'success', text });
       setRevision((value) => value + 1);
@@ -95,6 +101,8 @@ export function CreditLedger({ token, studentId }: { token: string; studentId?: 
       </div>
       {feedback && <Notice tone={feedback.tone}>{feedback.text}</Notice>}
       {!summary && !feedback && <LoadingState label="Загружаем баланс…" />}
+      {!studentId && summary?.balance === 1 && <Notice tone="warning">Осталось одно занятие.</Notice>}
+      {!studentId && summary?.balance === 0 && <Notice>Нет доступных занятий. Обратитесь к преподавателю, чтобы пополнить баланс.</Notice>}
       {studentId && summary && (
         <>
           <form className="form-stack" onSubmit={addCredits}>
@@ -108,8 +116,8 @@ export function CreditLedger({ token, studentId }: { token: string; studentId?: 
             <p className="muted">Дата считается по часовому поясу устройства ({timeZone}). Оставьте поле пустым для бессрочных занятий.</p>
             <Button type="submit" variant="primary" disabled={busy}>{validThrough ? 'Выдать абонемент' : 'Добавить занятия'}</Button>
           </form>
-          <section aria-label="Уроки к списанию">
-            <p className="item-title">К списанию</p>
+          <section aria-label="Уроки к подтверждению">
+            <p className="item-title">Требуют подтверждения</p>
             {summary.pending?.length ? (
               <ul className="item-list">
                 {summary.pending.map((lesson) => (
@@ -118,15 +126,17 @@ export function CreditLedger({ token, studentId }: { token: string; studentId?: 
                       <p>{lesson.reason === 'COMPLETED_LESSON' ? 'Прошедший урок' : labels[lesson.reason]}</p>
                       <time className="muted" dateTime={lesson.startsAt}>{date.format(new Date(lesson.startsAt))}</time>
                     </div>
-                    <Button disabled={busy || summary.balance === 0}
-                      onClick={() => void save('settle', { bookingId: lesson.bookingId }, 'Одно занятие списано.')}>
-                      {lesson.reason === 'COMPLETED_LESSON' ? 'Отметить проведённым и списать' : 'Списать одно занятие'}
+                    <Button disabled={busy || (lesson.reason === 'SAME_DAY_CANCELLATION' && summary.balance === 0)}
+                      onClick={() => void save(lesson.reason === 'COMPLETED_LESSON' ? 'complete' : 'settle',
+                        { bookingId: lesson.bookingId }, 'Одно занятие списано.')}>
+                      {lesson.reason === 'COMPLETED_LESSON' ? 'Отметить проведённым' : 'Списать одно занятие'}
                     </Button>
                   </li>
                 ))}
               </ul>
-            ) : <p className="muted">Нет уроков к списанию.</p>}
-            {!!summary.pending?.length && summary.balance === 0 && <p className="muted">Чтобы списать занятие, пополните баланс.</p>}
+            ) : <p className="muted">Нет уроков, требующих подтверждения.</p>}
+            {summary.pending?.some(({ reason }) => reason === 'SAME_DAY_CANCELLATION') && summary.balance === 0 &&
+              <p className="muted">Для списания за отмену в день урока сначала пополните баланс.</p>}
           </section>
         </>
       )}
@@ -139,7 +149,8 @@ export function CreditLedger({ token, studentId }: { token: string; studentId?: 
               <li key={pack.id} className="item-row">
                 <div>
                   <p>Осталось {pack.remaining} из {pack.amount}</p>
-                  <p className="muted">{pack.expired ? 'Срок истёк' : 'Действует по'}{' '}
+                  <progress value={pack.amount - pack.remaining} max={pack.amount} aria-label="Использовано занятий" />
+                  <p className="muted">{pack.expired ? 'Срок истёк' : pack.remaining ? 'Действует по' : 'Занятия закончились. Срок был до'}{' '}
                     <time dateTime={pack.validThrough}>{calendarDate.format(new Date(pack.validThrough))}</time>
                     {' '}({pack.timeZone})
                   </p>

@@ -43,6 +43,7 @@ test('credit routes scope student balance to the session and restrict grants to 
       },
       grant: async () => { throw new Error('Unexpected grant'); },
       settle: async () => { throw new Error('Unexpected settlement'); },
+      complete: async () => { throw new Error('Unexpected completion'); },
       reverse: async () => { throw new Error('Unexpected reversal'); },
     },
   });
@@ -60,12 +61,49 @@ test('credit routes scope student balance to the session and restrict grants to 
     method: 'POST', url: `/students/${student.id}/reverse`, headers: headers(student.id), payload: { entryId: randomUUID() },
   })).statusCode, 403);
   assert.equal((await app.inject({
+    method: 'POST', url: `/students/${student.id}/complete`, headers: headers(student.id), payload: { bookingId: randomUUID() },
+  })).statusCode, 403);
+  assert.equal((await app.inject({
     method: 'POST', url: `/students/${student.id}/reverse`, headers: headers(teacher.id), payload: { entryId: 'invalid' },
   })).statusCode, 400);
   assert.equal((await app.inject({ url: `/students/${student.id}`, headers: headers(teacher.id) })).statusCode, 200);
 });
 
 const url = process.env.TEST_DATABASE_URL;
+test('completion without credits is recorded once and a later grant does not charge it',
+  { skip: !url && 'Set TEST_DATABASE_URL to an isolated migrated PostgreSQL database' }, async () => {
+    const prisma = new PrismaClient({ datasourceUrl: url });
+    const ledger = creditLedger(prisma);
+    const studentId = randomUUID();
+    const slotId = randomUUID();
+    const bookingId = randomUUID();
+    try {
+      await prisma.user.create({ data: { id: studentId, role: 'STUDENT' } });
+      await prisma.availabilitySlot.create({ data: {
+        id: slotId, startsAt: new Date('2020-01-01T10:00:00Z'), endsAt: new Date('2020-01-01T11:00:00Z'), timeZone: 'UTC',
+      } });
+      await prisma.booking.create({ data: { id: bookingId, slotId, studentId } });
+      const [first, retry] = await Promise.all([ledger.complete(studentId, bookingId), ledger.complete(studentId, bookingId)]);
+      assert.ok(first.completedAt);
+      assert.equal(first.entry, null);
+      assert.deepEqual(retry, first);
+      await ledger.grant(studentId, randomUUID(), 1);
+      assert.deepEqual(await ledger.complete(studentId, bookingId), first);
+      await assert.rejects(ledger.settle(studentId, bookingId), { statusCode: 409 });
+      const summary = await ledger.summary(studentId, true);
+      assert.equal(summary.balance, 1);
+      assert.equal(summary.pending?.length, 0);
+    } finally {
+      try {
+        await prisma.creditEntry.deleteMany({ where: { studentId } });
+        await prisma.booking.deleteMany({ where: { id: bookingId } });
+        await prisma.availabilitySlot.deleteMany({ where: { id: slotId } });
+        await prisma.user.deleteMany({ where: { id: studentId } });
+      } finally {
+        await prisma.$disconnect();
+      }
+    }
+  });
 test('credit settlement is exclusive and concurrent bookings cannot overspend',
   { skip: !url && 'Set TEST_DATABASE_URL to an isolated migrated PostgreSQL database' }, async () => {
     const prisma = new PrismaClient({ datasourceUrl: url });

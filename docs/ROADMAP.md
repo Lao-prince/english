@@ -1,5 +1,7 @@
 # Roadmap
 
+See the [new product brief rollout](PRODUCT-IMPLEMENTATION.md) for the audit, dependencies and open decisions.
+
 | Phase | Scope |
 | --- | --- |
 | 0. Foundation | Local workspace, documentation, browser shell, API liveness and initial Prisma schema. |

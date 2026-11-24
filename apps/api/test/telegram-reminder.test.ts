@@ -4,6 +4,7 @@ import { setTimeout } from 'node:timers/promises';
 import { test } from 'node:test';
 import { PrismaClient } from '@prisma/client';
 import { lessonReminders } from '../src/lesson-reminders.js';
+import { availability } from '../src/availability.js';
 import { reminderText, sendReminder } from '../src/telegram-reminder.js';
 
 test('reminder text uses the lesson time zone', () => {
@@ -14,12 +15,13 @@ test('reminder text uses the lesson time zone', () => {
 });
 
 const url = process.env.TEST_DATABASE_URL;
-test('two reminder workers claim the same booking only once per recipient',
+test('two reminder workers claim once per recipient and rescheduling preserves the booking',
   { skip: !url && 'Set TEST_DATABASE_URL to an isolated migrated PostgreSQL database' }, async () => {
     const prisma = new PrismaClient({ datasourceUrl: url });
     const teacher = randomUUID();
     const student = randomUUID();
     const slotId = randomUUID();
+    const targetId = randomUUID();
     const bookingId = randomUUID();
     const stops: (() => Promise<void>)[] = [];
     const sent: bigint[] = [];
@@ -45,11 +47,32 @@ test('two reminder workers claim the same booking only once per recipient',
       assert.equal(failed, false);
       assert.deepEqual(sent.sort(), [9007199000000001n, 9007199000000002n]);
       assert.equal(await prisma.lessonReminder.count({ where: { bookingId, state: 'SENT' } }), 2);
+      const calendar = availability(prisma);
+      await calendar.publish({
+        id: targetId, startsAt: new Date(now + 4 * 3_600_000).toISOString(), durationMinutes: 60, timeZone: 'UTC',
+      });
+      const input = { requestId: randomUUID(), slotId: targetId, reopenPreviousSlot: true };
+      const [move, retry] = await Promise.all([
+        calendar.reschedule(bookingId, teacher, input), calendar.reschedule(bookingId, teacher, input),
+      ]);
+      assert.deepEqual(move, retry);
+      assert.equal(move.fromSlotId, slotId);
+      assert.equal((await calendar.book(slotId, student, bookingId)).slotId, targetId);
+      assert.equal(await prisma.creditEntry.count({ where: { bookingId } }), 0);
+      assert.ok((await calendar.list()).some(({ id }) => id === slotId));
+      const [upcoming] = await calendar.upcoming({ id: student, role: 'STUDENT' });
+      assert.equal(upcoming.id, bookingId);
+      assert.equal(upcoming.moves?.length, 1);
+      await calendar.book(slotId, student, randomUUID());
+      await assert.rejects(calendar.reschedule(bookingId, teacher, {
+        requestId: randomUUID(), slotId, reopenPreviousSlot: false,
+      }), { statusCode: 409 });
     } finally {
       await Promise.all(stops.map((stop) => stop()));
       try {
-        await prisma.booking.deleteMany({ where: { id: bookingId } });
-        await prisma.availabilitySlot.deleteMany({ where: { id: slotId } });
+        await prisma.bookingMove.deleteMany({ where: { bookingId } });
+        await prisma.booking.deleteMany({ where: { studentId: student, slotId: { in: [slotId, targetId] } } });
+        await prisma.availabilitySlot.deleteMany({ where: { id: { in: [slotId, targetId] } } });
         await prisma.user.deleteMany({ where: { id: { in: [teacher, student] } } });
       } finally {
         await prisma.$disconnect();
